@@ -1,0 +1,4 @@
+(fp_lib_table
+  (version 7)
+  (lib (name "Etch_a_sketch_footprints")(type "KiCad")(uri "${KIPRJMOD}/Etch_a_sketch_footprints.pretty")(options "")(descr ""))
+)

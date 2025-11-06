@@ -1,0 +1,5 @@
+(sym_lib_table
+  (version 7)
+  (lib (name "Component_library")(type "KiCad")(uri "${KIPRJMOD}/Component_library.kicad_sym")(options "")(descr ""))
+  (lib (name "Etch_a_sketch_components")(type "KiCad")(uri "${KIPRJMOD}/Etch_a_sketch_components.kicad_sym")(options "")(descr ""))
+)
