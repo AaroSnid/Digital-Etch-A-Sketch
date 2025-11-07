@@ -1,4 +1,4 @@
-26639894735676675
+26648705091729034
 Audio_Module
 Reverb_BTDR-1H
 Digital Reverberation Unit, http://www.belton.co.kr/inc/downfile.php?seq=17&file=pdf (footprint from http://www.uk-electronic.de/PDF/BTDR-1.pdf)
@@ -61348,26 +61348,19 @@ One digit LED 7 segment SA39-11 SC39-11 SA39-12 SC39-12
 10
 10
 Etch_a_sketch_footprints
-SOIC-8_5P28X5P28_WIN
+AA_Battery_Holder
 
-W25Q64JVSSIQ 
+
 0
-8
-8
+2
+2
 Etch_a_sketch_footprints
-SOIC-8_5P28X5P28_WIN-L
+Untitled
 
-W25Q64JVSSIQ 
-0
-8
-8
-Etch_a_sketch_footprints
-SOIC-8_5P28X5P28_WIN-M
 
-W25Q64JVSSIQ 
 0
-8
-8
+5
+5
 Ferrite_THT
 LairdTech_28C0236-0JW-10
 Ferrite, vertical, LairdTech 28C0236-0JW-10, https://assets.lairdtech.com/home/brandworld/files/28C0236-0JW-10.pdf, JW Miller core https://www.bourns.com/products/magnetic-products/j.w.-miller-through-hole-ferrite-beads-emi-filters
@@ -62663,6 +62656,13 @@ heatsink
 0
 0
 0
+ICM_42688_P
+PQFN50P300X250X97-14N
+
+
+0
+14
+14
 Inductor_SMD
 L_6.3x6.3_H3
 Choke, SMD, 6.3x6.3mm 3mm height
@@ -97124,6 +97124,13 @@ rotary encoder illuminated switch vertical
 0
 9
 8
+SPM10040T_2R2M
+IND_SPM10040T-2R2M
+
+
+0
+2
+2
 Sensor
 ASAIR_AM2302_P2.54mm_Lead2.75mm_TabDown
 Temperature and humidity module, http://akizukidenshi.com/download/ds/aosong/AM2302.pdf
@@ -106273,3 +106280,31 @@ Varistor VF
 0
 2
 2
+tps_footprints
+DRC10_2P4X1P65
+
+TPS61201DRCT 
+0
+10
+10
+w25_footprints
+SOIC-8_5P28X5P28_WIN
+
+W25Q64JVSSIQ 
+0
+8
+8
+w25_footprints
+SOIC-8_5P28X5P28_WIN-L
+
+W25Q64JVSSIQ 
+0
+8
+8
+w25_footprints
+SOIC-8_5P28X5P28_WIN-M
+
+W25Q64JVSSIQ 
+0
+8
+8
