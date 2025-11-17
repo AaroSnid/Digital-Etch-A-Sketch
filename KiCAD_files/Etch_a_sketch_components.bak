@@ -71,7 +71,7 @@
 						)
 					)
 				)
-				(number "1"
+				(number "A"
 					(effects
 						(font
 							(size 1.27 1.27)
@@ -89,7 +89,7 @@
 						)
 					)
 				)
-				(number "4"
+				(number "1"
 					(effects
 						(font
 							(size 1.27 1.27)
@@ -107,7 +107,7 @@
 						)
 					)
 				)
-				(number "2"
+				(number "COM"
 					(effects
 						(font
 							(size 1.27 1.27)
@@ -125,7 +125,7 @@
 						)
 					)
 				)
-				(number "5"
+				(number "2"
 					(effects
 						(font
 							(size 1.27 1.27)
@@ -143,7 +143,7 @@
 						)
 					)
 				)
-				(number "3"
+				(number "B"
 					(effects
 						(font
 							(size 1.27 1.27)
