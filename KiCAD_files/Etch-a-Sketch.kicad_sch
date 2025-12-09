@@ -8120,7 +8120,7 @@
 				(justify left)
 			)
 		)
-		(property "Value" "4.7uF"
+		(property "Value" "10uF"
 			(at 80.01 36.8362 0)
 			(effects
 				(font
@@ -9013,7 +9013,7 @@
 				(justify left)
 			)
 		)
-		(property "Value" "0.12uF"
+		(property "Value" "0.1uF"
 			(at 131.064 39.878 0)
 			(effects
 				(font
@@ -10798,7 +10798,7 @@
 				(justify left)
 			)
 		)
-		(property "Value" "12uF"
+		(property "Value" "10uF"
 			(at 142.24 39.3762 0)
 			(effects
 				(font
@@ -12388,7 +12388,7 @@
 				)
 			)
 		)
-		(property "Footprint" "282837_2:TE_282837-2"
+		(property "Footprint" "Connector_JST:JST_PH_B2B-PH-K_1x02_P2.00mm_Vertical"
 			(at 33.02 35.56 0)
 			(effects
 				(font
