@@ -1,9 +1,7 @@
 #include "icm_42688.h"
 #include "icm_42688_registers.h"
 
-#define TX_RX_LENGTH 21     // Max length chosen for SPI fifo read
-// uint8_t tx_data[TX_RX_LENGTH] = {0};
-// uint8_t rx_data[TX_RX_LENGTH] = {0};
+#define CALIBRARION_SAMPLES 200.0
 
 int icm_42688_config(icm_42688_cfg_t* hw_cfg, void* comms_handle, GPIO_TypeDef* gpio_port, uint16_t gpio_pin){
     hw_cfg->comms_handle = comms_handle;
@@ -31,19 +29,20 @@ void build_spi_message(uint8_t* message, uint8_t read_write, uint8_t reg, uint8_
 
 int spi_read_data(icm_42688_cfg_t* hw_cfg, uint8_t reg, uint8_t* rx_data, uint8_t no_bytes){
     if (no_bytes < 2) return -1;    // Minimum 2 bytes
-    uint8_t tx_data[no_bytes + 1];
+    uint8_t tx_buf[no_bytes + 1];
+    uint8_t rx_buf[no_bytes + 1];
 
     // Fill tx_data with data that will not affect chip
-    for (int i = 0; i <= no_bytes; i++) tx_data[i] = 0xFF;
-    build_spi_message(tx_data, 1, reg, 0);
+    for (int i = 0; i <= no_bytes; i++) tx_buf[i] = 0xFF;
+    build_spi_message(tx_buf, 1, reg, 0);
 
     cs_low(hw_cfg);
-    HAL_StatusTypeDef status = HAL_SPI_TransmitReceive(hw_cfg->comms_handle, tx_data, rx_data, no_bytes + 1, HAL_MAX_DELAY);
+    HAL_StatusTypeDef status = HAL_SPI_TransmitReceive(hw_cfg->comms_handle, tx_buf, rx_buf, no_bytes + 1, HAL_MAX_DELAY);
     cs_high(hw_cfg);
     if (status != HAL_OK) return -1;
     
-    for(int i = 1; i < TX_RX_LENGTH; i++){
-        rx_data[i - 1] = rx_data[i];
+    for(int i = 1; i < no_bytes; i++){
+        rx_data[i - 1] = rx_buf[i];
     }
     return 0;
 }
@@ -97,6 +96,104 @@ int configure_device(icm_42688_cfg_t* hw_cfg){
     return 0;
 }
 
+int set_accel_fs(icm_42688_cfg_t* hw_cfg, uint8_t full_scale){
+    if (set_bank(hw_cfg, 0) != 0) return -1;
+    return read_mod_write(hw_cfg, 0b111, ACCEL_CONFIG0, full_scale, 5);
+}
+
+int get_accel_fs(icm_42688_cfg_t* hw_cfg, uint8_t* full_scale){
+    if (set_bank(hw_cfg, 0) != 0) return -1;
+    return read_reg_data(hw_cfg, ACCEL_CONFIG0, full_scale);
+}
+
+int set_gyro_fs(icm_42688_cfg_t* hw_cfg, uint8_t full_scale){
+    if (set_bank(hw_cfg, 0) != 0) return -1;
+    return read_mod_write(hw_cfg, 0b111, GYRO_CONFIG0, full_scale, 5);
+}
+
+int get_gyro_fs(icm_42688_cfg_t* hw_cfg, uint8_t* full_scale){
+    if (set_bank(hw_cfg, 0) != 0) return -1;
+    return read_reg_data(hw_cfg, GYRO_CONFIG0, full_scale);
+}
+
+int set_accel_odr(icm_42688_cfg_t* hw_cfg, uint8_t out_data_rate){
+    if (set_bank(hw_cfg, 0) != 0) return -1;
+    return read_mod_write(hw_cfg, 0b1111, ACCEL_CONFIG0, out_data_rate, 0);
+}
+
+int set_gyro_odr(icm_42688_cfg_t* hw_cfg, uint8_t out_data_rate){
+    if (set_bank(hw_cfg, 0) != 0) return -1;
+    return read_mod_write(hw_cfg, 0b1111, GYRO_CONFIG0, out_data_rate, 0);
+}
+
+int read_accel_xyz(icm_42688_cfg_t* hw_cfg, uint16_t* xyz_data){
+    if (set_bank(hw_cfg, 0) != 0) return -1;
+    uint8_t rx_data[6];
+    if (spi_read_data(hw_cfg, ACCEL_DATA_X1, rx_data, 6) != 0) return -1;
+    xyz_data[0] = (rx_data[0] << 8) | rx_data[1];
+    xyz_data[1] = (rx_data[2] << 8) | rx_data[3];
+    xyz_data[2] = (rx_data[4] << 8) | rx_data[5];
+    return 0;
+}
+
+int read_gyro_xyz(icm_42688_cfg_t* hw_cfg, uint16_t* xyz_data){
+    if (set_bank(hw_cfg, 0) != 0) return -1;
+    uint8_t rx_data[6];
+    if (spi_read_data(hw_cfg, GYRO_DATA_X1, rx_data, 6) != 0) return -1;
+    xyz_data[0] = (uint16_t)(rx_data[0] << 8) | rx_data[1];
+    xyz_data[1] = (uint16_t)(rx_data[2] << 8) | rx_data[3];
+    xyz_data[2] = (uint16_t)(rx_data[4] << 8) | rx_data[5];
+    return 0;
+}
+
+int calibrate_accel(icm_42688_cfg_t* hw_cfg){
+    uint8_t current_scale = 0;
+    if (get_accel_fs(hw_cfg, &current_scale) != 0) return -1;
+
+    // Set higher resolution for calibration
+    if (set_accel_fs(hw_cfg, 3) != 0) return -1;
+
+    uint32_t accel_data_xyz[3] = {0};
+    uint16_t rx_data[3] = {0};
+    for (int i = 0; i < CALIBRARION_SAMPLES; i++){
+        if (read_accel_xyz(hw_cfg, rx_data) != 0) return -1;
+        accel_data_xyz[0] += rx_data[0];
+        accel_data_xyz[1] += rx_data[1];
+        accel_data_xyz[2] += rx_data[2];
+        HAL_Delay(1);
+    }
+    hw_cfg->accel_calibration[0] = ((double)accel_data_xyz[0] / CALIBRARION_SAMPLES);
+    hw_cfg->accel_calibration[1] = ((double)accel_data_xyz[1] / CALIBRARION_SAMPLES);
+    hw_cfg->accel_calibration[2] = ((double)accel_data_xyz[2] / CALIBRARION_SAMPLES);
+
+    if (set_accel_fs(hw_cfg, current_scale) != 0) return -1;
+    return 0;
+}
+
+int calibrate_gyro(icm_42688_cfg_t* hw_cfg){
+    uint8_t current_scale = 0;
+    if (get_gyro_fs(hw_cfg, &current_scale) != 0) return -1;
+
+    // Set higher resolution for calibration
+    if (set_gyro_fs(hw_cfg, 3) != 0) return -1;
+
+    uint32_t gyro_data_xyz[3] = {0};
+    uint16_t rx_data[3] = {0};
+    for (int i = 0; i < CALIBRARION_SAMPLES; i++){
+        if (read_accel_xyz(hw_cfg, rx_data) != 0) return -1;
+        gyro_data_xyz[0] += rx_data[0];
+        gyro_data_xyz[1] += rx_data[1];
+        gyro_data_xyz[2] += rx_data[2];
+        HAL_Delay(1);
+    }
+    hw_cfg->accel_calibration[0] = ((double)gyro_data_xyz[0] / CALIBRARION_SAMPLES);
+    hw_cfg->accel_calibration[1] = ((double)gyro_data_xyz[1] / CALIBRARION_SAMPLES);
+    hw_cfg->accel_calibration[2] = ((double)gyro_data_xyz[2] / CALIBRARION_SAMPLES);
+
+    if (set_gyro_fs(hw_cfg, current_scale) != 0) return -1;
+    return 0;
+}
+
 int configure_fifo_register(icm_42688_cfg_t* hw_cfg, uint8_t packet_structure){
     hw_cfg->packet_no = packet_structure;
     set_bank(hw_cfg, 0); // Bank 0 data
@@ -127,7 +224,7 @@ int configure_fifo_register(icm_42688_cfg_t* hw_cfg, uint8_t packet_structure){
 int read_fifo(icm_42688_cfg_t* hw_cfg, uint8_t* gyro_data, uint8_t* accel_data, uint8_t* temp_data, uint8_t* time_data, uint8_t* extened_data){
     // This could be changed to read the header data instead of the packet variable (page 37) except for needing different read lengths
 
-    set_bank(hw_cfg, 0); // Bank 0 data
+    if (set_bank(hw_cfg, 0) != 0) return -1; // Bank 0 data
 
     if (hw_cfg->packet_no == 0){
         return -1; // FIFO unconfigured
@@ -135,7 +232,7 @@ int read_fifo(icm_42688_cfg_t* hw_cfg, uint8_t* gyro_data, uint8_t* accel_data, 
         if (accel_data == NULL) return -1;
         if (temp_data == NULL) return -1;
 
-        uint8_t rx_data[9];
+        uint8_t rx_data[8];
         if (spi_read_data(hw_cfg, FIFO_DATA, rx_data, 8) != 0) return -1;
         for (int i = 1; i < 7; i++){
             accel_data[i - 1] = rx_data[i];
@@ -145,7 +242,7 @@ int read_fifo(icm_42688_cfg_t* hw_cfg, uint8_t* gyro_data, uint8_t* accel_data, 
         if (gyro_data == NULL) return -1;
         if (temp_data == NULL) return -1;
 
-        uint8_t rx_data[9];
+        uint8_t rx_data[8];
         if (spi_read_data(hw_cfg, FIFO_DATA, rx_data, 8) != 0) return -1;
         for (int i = 1; i < 7; i++){
             gyro_data[i - 1] = rx_data[i];
@@ -156,7 +253,7 @@ int read_fifo(icm_42688_cfg_t* hw_cfg, uint8_t* gyro_data, uint8_t* accel_data, 
         if (gyro_data == NULL) return -1;
         if (temp_data == NULL) return -1;
 
-        uint8_t rx_data[17];
+        uint8_t rx_data[16];
         if (spi_read_data(hw_cfg, FIFO_DATA, rx_data, 16) != 0) return -1;
         for (int i = 1; i < 7; i++){
             accel_data[i - 1] = rx_data[i];
@@ -174,7 +271,7 @@ int read_fifo(icm_42688_cfg_t* hw_cfg, uint8_t* gyro_data, uint8_t* accel_data, 
         if (temp_data == NULL) return -1;
         if (extened_data == NULL) return -1;
 
-        uint8_t rx_data[21];
+        uint8_t rx_data[20];
         if (spi_read_data(hw_cfg, FIFO_DATA, rx_data, 20) != 0) return -1;
         for (int i = 1; i < 7; i++){
             accel_data[i - 1] = rx_data[i];
@@ -198,9 +295,9 @@ int read_fifo(icm_42688_cfg_t* hw_cfg, uint8_t* gyro_data, uint8_t* accel_data, 
 
 int test_comms(icm_42688_cfg_t* hw_cfg){
     if (reset_device(hw_cfg) == -1) return -1;
-    uint8_t rx_data[2];
+    uint8_t rx_data[1];
     if (spi_read_data(hw_cfg, WHO_AM_I, rx_data, 1) == -1) return -1;
-    if (rx_data[1] != 0x47) return -1;
+    if (rx_data[0] != 0x47) return -1;
     return 0;
 }
 
@@ -226,32 +323,97 @@ int configure_apex_tilt_detection(icm_42688_cfg_t* hw_cfg, uint8_t performance_m
     return -1; // Function not yet implemented
 }
 
-int configure_apex_raise_to_wake(icm_42688_cfg_t* hw_cfg, uint8_t performance_mode, uint8_t interrupt_config){
+int configure_apex_raise_to_wake(icm_42688_cfg_t* hw_cfg, uint8_t performance_mode, uint8_t interrupt_config, uint8_t wake_sleep){
+    if (set_bank(hw_cfg, 0) != 0) return -1;
+    if (read_mod_write(hw_cfg, 0b1111, ACCEL_CONFIG0, 0x0A, 0) != 0) return -1;
+    if (read_mod_write(hw_cfg, 0b11, PWR_MGMT0, 0x02, 0) != 0) return -1;
+    if (read_mod_write(hw_cfg, 0b1, INTF_CONFIG1, 0x0, 3) != 0) return -1;
+    if (read_mod_write(hw_cfg, 0b11, APEX_CONFIG0, 0x02, 0) != 0) return -1;
+    HAL_Delay(1);
 
-    return -1; // Function not yet implemented
+    if (write_reg(hw_cfg, SIGNAL_PATH_RESET, 0x20) != 0) return -1;
+    HAL_Delay(1);
+    if (set_bank(hw_cfg, 4) != 0) return -1;
+    if (read_mod_write(hw_cfg, 0b111, APEX_CONFIG4, 0x07, 3) != 0) return -1;
+    HAL_Delay(1);
+    if (read_mod_write(hw_cfg, 0b111, APEX_CONFIG5, 0x07, 3) != 0) return -1;
+    HAL_Delay(1);
+    if (read_mod_write(hw_cfg, 0b111, APEX_CONFIG6, 0x07, 3) != 0) return -1;
+    HAL_Delay(1);
+    if (set_bank(hw_cfg, 0) != 0) return -1;
+    if (read_mod_write(hw_cfg, 0b1, SIGNAL_PATH_RESET, 0x01, 6) != 0) return -1;
+
+    if (set_bank(hw_cfg, 4) != 0) return -1;
+    uint8_t data = 0b01; 
+    if (wake_sleep == 0){
+        data = 0b10;
+    }
+    if (interrupt_config == 1){
+        if (read_mod_write(hw_cfg, data, INT_SOURCE6, data, 1) != 0) return -1;
+    } else if (interrupt_config == 1){
+        if (read_mod_write(hw_cfg, data, INT_SOURCE7, data, 1) != 0) return -1;
+    }
+    HAL_Delay(50);
+    
+    if (set_bank(hw_cfg, 0) != 0) return -1;
+    if (read_mod_write(hw_cfg, 0b1, APEX_CONFIG0, 0x1, 3) != 0) return -1;
+    return 0;
 }
 
 int configure_apex_tap_detection(icm_42688_cfg_t* hw_cfg, uint8_t performance_mode, uint8_t interrupt_config){
     if (performance_mode > 3) return -1;    // Invalid selection
-    return -1; // Function not yet implemented
+
+    if (set_bank(hw_cfg, 0) != 0) return -1;
+    uint8_t rx_data[1];
+    if (read_reg_data(hw_cfg, ACCEL_CONFIG0, rx_data) != 0) return -1;
+    uint8_t accel_odr = rx_data[0] & 0x0F;
+    if ((accel_odr != 0x7) && (accel_odr != 0xF) && (accel_odr != 0x6)) { // Check for 200Hz, 500Hz, 1kHz
+        if (write_reg(hw_cfg, ACCEL_CONFIG0, (rx_data[0] & 0xF0) | 0x0F) != 0) return -1;
+        accel_odr = 0x0F;
+    }
+    if (accel_odr != 0x6){
+        if (read_mod_write(hw_cfg, 0x11, PWR_MGMT0, 0x02, 0) != 0) return -1;
+        if (read_mod_write(hw_cfg, 0b1, INTF_CONFIG1, 0x1, 3) != 0) return -1;
+        if (read_mod_write(hw_cfg, 0b11, ACCEL_CONFIG1, 0x2, 1) != 0) return -1;
+        if (read_mod_write(hw_cfg, 0b1111, GYRO_ACCEL_CONFIG0, 0x4, 4) != 0) return -1;
+    } else {
+        if (read_mod_write(hw_cfg, 0x11, PWR_MGMT0, 0x01, 0) != 0) return -1;
+        if (read_mod_write(hw_cfg, 0b11, ACCEL_CONFIG1, 0x2, 3) != 0) return -1;
+        if (read_mod_write(hw_cfg, 0b1111, GYRO_ACCEL_CONFIG0, 0x0, 4) != 0) return -1;
+    }
+    HAL_Delay(1);
+
+    if (set_bank(hw_cfg, 4) != 0) return -1;
+    if (write_reg(hw_cfg, APEX_CONFIG8, 0x5B) != 0) return -1;
+    if (write_reg(hw_cfg, APEX_CONFIG7, 0x46) != 0) return -1;
+    HAL_Delay(1);
+
+    if (interrupt_config == 1){
+        if (read_mod_write(hw_cfg, 0b1, INT_SOURCE6, 0x01, 0) != 0) return -1;
+    } else if (interrupt_config == 2){
+        if (read_mod_write(hw_cfg, 0b1, INT_SOURCE7, 0x01, 0) != 0) return -1;
+    }
+    HAL_Delay(50);
+
+    if (read_mod_write(hw_cfg, 0b1, APEX_CONFIG0, 0x01, 6) != 0) return -1;
+    return 0;
 }
 
 int configure_apex_wake_on_motion(icm_42688_cfg_t* hw_cfg, uint8_t interrupt_config){
-    
     // Initialize Sensor in a typical configuration
     if (set_bank(hw_cfg, 0) != 0) return -1;
     if (read_mod_write(hw_cfg, 0b1111, ACCEL_CONFIG0, 0x09, 0b0) != 0) return -1;
     if (read_mod_write(hw_cfg, 0b11, PWR_MGMT0, 0x02, 0b0) != 0) return -1;
     HAL_Delay(1);
 
-    set_bank(hw_cfg, 4);
+    if (set_bank(hw_cfg, 4) != 0) return -1;
     if (write_reg(hw_cfg, ACCEL_WOM_X_THR, 98) != 0) return -1;
     if (write_reg(hw_cfg, ACCEL_WOM_Y_THR, 98) != 0) return -1;
     if (write_reg(hw_cfg, ACCEL_WOM_Z_THR, 98) != 0) return -1;
     HAL_Delay(1);
 
     // Enable interrupt source
-    set_bank(hw_cfg, 0);
+    if (set_bank(hw_cfg, 0) != 0) return -1;
     if (interrupt_config == 1){
         if (read_mod_write(hw_cfg, 0b111, INT_SOURCE1, 0x07, 0b0) != 0) return -1;
     } else if (interrupt_config == 2){
@@ -259,11 +421,30 @@ int configure_apex_wake_on_motion(icm_42688_cfg_t* hw_cfg, uint8_t interrupt_con
     }
     HAL_Delay(50);
     if (read_mod_write(hw_cfg, 0b1111, SMD_CONFIG, 0b0110, 0b0) != 0) return -1;
-
     return 0;
 }
 
 int configure_apex_sig_motion_detect(icm_42688_cfg_t* hw_cfg, uint8_t interrupt_config){
+    // Initialize Sensor in a typical configuration
+    if (set_bank(hw_cfg, 0) != 0) return -1;
+    if (read_mod_write(hw_cfg, 0b1111, ACCEL_CONFIG0, 0x09, 0b0) != 0) return -1;
+    if (read_mod_write(hw_cfg, 0b11, PWR_MGMT0, 0x02, 0b0) != 0) return -1;
+    HAL_Delay(1);
 
-    return -1; // Function not yet implemented
+    if (set_bank(hw_cfg, 4) != 0) return -1;
+    if (write_reg(hw_cfg, ACCEL_WOM_X_THR, 98) != 0) return -1;
+    if (write_reg(hw_cfg, ACCEL_WOM_Y_THR, 98) != 0) return -1;
+    if (write_reg(hw_cfg, ACCEL_WOM_Z_THR, 98) != 0) return -1;
+    HAL_Delay(1);
+
+    // Enable interrupt source
+    if (set_bank(hw_cfg, 0) != 0) return -1;
+    if (interrupt_config == 1){
+        if (read_mod_write(hw_cfg, 0b1, INT_SOURCE1, 0x01, 3) != 0) return -1;
+    } else if (interrupt_config == 2){
+        if (read_mod_write(hw_cfg, 0b1, INT_SOURCE4, 0x01, 3) != 0) return -1;
+    }
+    HAL_Delay(50);
+    if (read_mod_write(hw_cfg, 0b1111, SMD_CONFIG, 0b0111, 0b0) != 0) return -1;
+    return 0;
 }

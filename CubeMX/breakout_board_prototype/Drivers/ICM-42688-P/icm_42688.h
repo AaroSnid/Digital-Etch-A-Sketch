@@ -9,6 +9,8 @@ typedef struct {
     GPIO_TypeDef* gpio_port;
     uint16_t gpio_pin;
     uint8_t packet_no;
+    float accel_calibration[3];
+    float gyro_calibration[3];
 } icm_42688_cfg_t;
 
 int reset_device(icm_42688_cfg_t* hw_cfg);
