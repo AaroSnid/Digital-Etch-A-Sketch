@@ -118,7 +118,7 @@ int main(void)
   icm_42688_cfg_t imu_cfg;
   icm_42688_config(&imu_cfg, &hspi1, GPIOA, GPIO_PIN_10);
 
-  int status = reset_device(&imu_cfg);
+  int status = icm_42688_reset_device(&imu_cfg);
   if (status == -1){
     int i = 0;
     while (i < 100){
