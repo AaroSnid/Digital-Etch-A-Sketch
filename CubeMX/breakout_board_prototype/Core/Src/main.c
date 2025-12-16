@@ -22,6 +22,7 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "icm_42688.h"
+#include "ili9488.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -31,6 +32,10 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
+
+#define ETCH_A_SKETCH_YELLOW 0xd592
+#define debug_led_on() HAL_GPIO_WritePin(GPIOB, GPIO_PIN_13, GPIO_PIN_SET)
+#define debug_led_off() HAL_GPIO_WritePin(GPIOB, GPIO_PIN_13, GPIO_PIN_RESET)
 
 /* USER CODE END PD */
 
@@ -43,7 +48,6 @@
 QSPI_HandleTypeDef hqspi;
 
 SPI_HandleTypeDef hspi1;
-SPI_HandleTypeDef hspi3;
 
 TIM_HandleTypeDef htim1;
 TIM_HandleTypeDef htim2;
@@ -53,6 +57,12 @@ UART_HandleTypeDef huart2;
 
 /* USER CODE BEGIN PV */
 
+icm_42688_cfg_t imu_cfg;
+volatile uint8_t state = 0;
+volatile uint8_t last_state = 0;
+volatile uint16_t last_x_pos = 1;
+volatile uint16_t last_y_pos = 1;
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -60,19 +70,19 @@ void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_QUADSPI_Init(void);
 static void MX_SPI1_Init(void);
-static void MX_SPI3_Init(void);
 static void MX_TIM1_Init(void);
 static void MX_TIM2_Init(void);
 static void MX_TIM16_Init(void);
 static void MX_USART2_UART_Init(void);
 /* USER CODE BEGIN PFP */
 
+static void clear_screen();
+
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-#define debug_led_on() HAL_GPIO_WritePin(GPIOB, GPIO_PIN_13, GPIO_PIN_SET)
-#define debug_led_off() HAL_GPIO_WritePin(GPIOB, GPIO_PIN_13, GPIO_PIN_RESET)
+
 /* USER CODE END 0 */
 
 /**
@@ -106,42 +116,83 @@ int main(void)
   MX_GPIO_Init();
   MX_QUADSPI_Init();
   MX_SPI1_Init();
-  MX_SPI3_Init();
   MX_TIM1_Init();
   MX_TIM2_Init();
   MX_TIM16_Init();
   MX_USART2_UART_Init();
   /* USER CODE BEGIN 2 */
 
+  // TIM16->;
+  HAL_TIM_PWM_Start(&htim16, TIM_CHANNEL_1);
   HAL_TIM_Encoder_Start(&htim2, TIM_CHANNEL_ALL);
   HAL_TIM_Encoder_Start(&htim1, TIM_CHANNEL_ALL);
-  icm_42688_cfg_t imu_cfg;
-  icm_42688_config(&imu_cfg, &hspi1, GPIOA, GPIO_PIN_10);
+  // icm_42688_config(&imu_cfg, &hspi1, GPIOA, GPIO_PIN_10);
 
-  int status = icm_42688_reset_device(&imu_cfg);
-  if (status == -1){
-    int i = 0;
-    while (i < 100){
-      debug_led_on();
-      HAL_Delay(100);
-      debug_led_off();
-      HAL_Delay(100);
-      i++;
-    }
-  }
+  // int status = icm_42688_reset_device(&imu_cfg);
+  // if (status == -1){
+  //   int i = 0;
+  //   while (i < 10){
+  //     debug_led_on();
+  //     HAL_Delay(100);
+  //     debug_led_off();
+  //     HAL_Delay(100);
+  //     i++;
+  //   }
+  // }
 
+  ILI9488_Init();
+  setRotation(3);
+  clear_screen();
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
+    switch (state){
 
-	  if (TIM2->CNT == 60){
-	  		  debug_led_on();
-	  	  } else {
-	  		  debug_led_off();
-	  	  } 
+      case 0:
+
+        uint16_t x_pos = TIM1->CNT / 4;
+        uint16_t y_pos = TIM2->CNT / 4;
+
+        if (x_pos != last_x_pos){
+          uint16_t width = (x_pos > last_x_pos) ? (x_pos - last_x_pos) : (last_x_pos - x_pos);
+
+          // Check for wrap overflow or underflow
+          if (width > 440){
+            // Normalize to border, recalculate width
+            last_x_pos = (last_x_pos > 240) ? 480 : 0;
+            width = (x_pos > last_x_pos) ? (x_pos - last_x_pos) : (last_x_pos - x_pos);
+          }
+
+          // Start point must be on the right
+          uint16_t start_point = (x_pos > last_x_pos) ? last_x_pos : x_pos;
+          drawFastHLine(start_point, last_y_pos, width, TFT9341_BLACK);
+          last_x_pos = x_pos;
+        }
+
+        if (y_pos != last_y_pos){
+          uint16_t width = (y_pos > last_y_pos) ? (y_pos - last_y_pos) : (last_y_pos - y_pos);
+
+          // Check for wrap overflow or underflow
+          if (width > 300){
+            // Normalize to border, recalculate width
+            last_y_pos = (last_y_pos > 160) ? 320 : 0;
+            width = (y_pos > last_y_pos) ? (y_pos - last_y_pos) : (last_y_pos - y_pos);
+          }
+
+          // Start point must be on the bottom
+          uint16_t start_point = (y_pos > last_y_pos) ? last_y_pos : y_pos;
+          drawFastVLine(last_x_pos, start_point, width, TFT9341_BLACK);
+          last_y_pos = y_pos;
+        }
+      break;
+      case 1:
+        float duty_cycle = (float)TIM2->CNT / (float)TIM2->ARR;
+        TIM16->CCR1 = duty_cycle * TIM16->ARR;
+      break;
+    }
 
     /* USER CODE END WHILE */
 
@@ -252,8 +303,8 @@ static void MX_SPI1_Init(void)
   /* SPI1 parameter configuration*/
   hspi1.Instance = SPI1;
   hspi1.Init.Mode = SPI_MODE_MASTER;
-  hspi1.Init.Direction = SPI_DIRECTION_2LINES;
-  hspi1.Init.DataSize = SPI_DATASIZE_4BIT;
+  hspi1.Init.Direction = SPI_DIRECTION_1LINE;
+  hspi1.Init.DataSize = SPI_DATASIZE_8BIT;
   hspi1.Init.CLKPolarity = SPI_POLARITY_LOW;
   hspi1.Init.CLKPhase = SPI_PHASE_1EDGE;
   hspi1.Init.NSS = SPI_NSS_SOFT;
@@ -271,46 +322,6 @@ static void MX_SPI1_Init(void)
   /* USER CODE BEGIN SPI1_Init 2 */
 
   /* USER CODE END SPI1_Init 2 */
-
-}
-
-/**
-  * @brief SPI3 Initialization Function
-  * @param None
-  * @retval None
-  */
-static void MX_SPI3_Init(void)
-{
-
-  /* USER CODE BEGIN SPI3_Init 0 */
-
-  /* USER CODE END SPI3_Init 0 */
-
-  /* USER CODE BEGIN SPI3_Init 1 */
-
-  /* USER CODE END SPI3_Init 1 */
-  /* SPI3 parameter configuration*/
-  hspi3.Instance = SPI3;
-  hspi3.Init.Mode = SPI_MODE_MASTER;
-  hspi3.Init.Direction = SPI_DIRECTION_2LINES;
-  hspi3.Init.DataSize = SPI_DATASIZE_4BIT;
-  hspi3.Init.CLKPolarity = SPI_POLARITY_LOW;
-  hspi3.Init.CLKPhase = SPI_PHASE_1EDGE;
-  hspi3.Init.NSS = SPI_NSS_SOFT;
-  hspi3.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_2;
-  hspi3.Init.FirstBit = SPI_FIRSTBIT_MSB;
-  hspi3.Init.TIMode = SPI_TIMODE_DISABLE;
-  hspi3.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
-  hspi3.Init.CRCPolynomial = 7;
-  hspi3.Init.CRCLength = SPI_CRC_LENGTH_DATASIZE;
-  hspi3.Init.NSSPMode = SPI_NSS_PULSE_ENABLE;
-  if (HAL_SPI_Init(&hspi3) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  /* USER CODE BEGIN SPI3_Init 2 */
-
-  /* USER CODE END SPI3_Init 2 */
 
 }
 
@@ -433,9 +444,9 @@ static void MX_TIM16_Init(void)
 
   /* USER CODE END TIM16_Init 1 */
   htim16.Instance = TIM16;
-  htim16.Init.Prescaler = 0;
+  htim16.Init.Prescaler = 79;
   htim16.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim16.Init.Period = 65535;
+  htim16.Init.Period = 999;
   htim16.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim16.Init.RepetitionCounter = 0;
   htim16.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
@@ -530,13 +541,19 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOB_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOC, TFT_RST_Pin|TFT_DC_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(TFT_DC_GPIO_Port, TFT_DC_Pin, GPIO_PIN_RESET);
+
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(TFT_RST_GPIO_Port, TFT_RST_Pin, GPIO_PIN_SET);
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOB, QUADSPI_CS_Pin|LD4_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOA, SPI1_CS_Pin|SPI3_CS_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(TFT_CS_GPIO_Port, TFT_CS_Pin, GPIO_PIN_SET);
+
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(SPI3_CS_GPIO_Port, SPI3_CS_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin : B1_Pin */
   GPIO_InitStruct.Pin = B1_Pin;
@@ -544,12 +561,19 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(B1_GPIO_Port, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : TFT_RST_Pin TFT_DC_Pin */
-  GPIO_InitStruct.Pin = TFT_RST_Pin|TFT_DC_Pin;
+  /*Configure GPIO pin : TFT_DC_Pin */
+  GPIO_InitStruct.Pin = TFT_DC_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
+  HAL_GPIO_Init(TFT_DC_GPIO_Port, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : TFT_RST_Pin */
+  GPIO_InitStruct.Pin = TFT_RST_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
+  HAL_GPIO_Init(TFT_RST_GPIO_Port, &GPIO_InitStruct);
 
   /*Configure GPIO pin : EXTI_PB_2_Pin */
   GPIO_InitStruct.Pin = EXTI_PB_2_Pin;
@@ -570,12 +594,19 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(EXTI_PB_1_GPIO_Port, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : SPI1_CS_Pin SPI3_CS_Pin */
-  GPIO_InitStruct.Pin = SPI1_CS_Pin|SPI3_CS_Pin;
+  /*Configure GPIO pin : TFT_CS_Pin */
+  GPIO_InitStruct.Pin = TFT_CS_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
+  HAL_GPIO_Init(TFT_CS_GPIO_Port, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : SPI3_CS_Pin */
+  GPIO_InitStruct.Pin = SPI3_CS_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+  HAL_GPIO_Init(SPI3_CS_GPIO_Port, &GPIO_InitStruct);
 
   /*Configure GPIO pins : EXTI_IMU_INT_1_Pin EXTI_IMU_INT_2_Pin */
   GPIO_InitStruct.Pin = EXTI_IMU_INT_1_Pin|EXTI_IMU_INT_2_Pin;
@@ -589,6 +620,31 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
+
+void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
+  if (GPIO_Pin == EXTI_PB_1_Pin) {
+    if (state != 1){
+      // Save cursor position and state
+      last_x_pos = TIM1->CNT / 4;
+      last_y_pos = TIM2->CNT / 4;
+      last_state = state;
+      state = 1;
+    } else {
+      // Restore cursor and state
+      TIM1->CNT = last_x_pos * 4;
+      TIM2->CNT = last_y_pos * 4;
+      state = last_state;
+    }
+  } else if (GPIO_Pin == EXTI_PB_2_Pin) {
+    clear_screen();
+  }
+}
+
+static void clear_screen() {
+  for (int i = 0; i < 16; i++) {
+    fillRect(0, 20 * i, 480, 20, ETCH_A_SKETCH_YELLOW);
+  }
+}
 
 /* USER CODE END 4 */
 
