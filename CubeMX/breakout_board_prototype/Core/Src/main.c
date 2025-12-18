@@ -76,7 +76,7 @@ static void MX_TIM16_Init(void);
 static void MX_USART2_UART_Init(void);
 /* USER CODE BEGIN PFP */
 
-static void clear_screen();
+static void clear_screen(int colour);
 
 /* USER CODE END PFP */
 
@@ -122,7 +122,7 @@ int main(void)
   MX_USART2_UART_Init();
   /* USER CODE BEGIN 2 */
 
-  // TIM16->;
+  TIM16->CCR1 = TIM16->ARR;
   HAL_TIM_PWM_Start(&htim16, TIM_CHANNEL_1);
   HAL_TIM_Encoder_Start(&htim2, TIM_CHANNEL_ALL);
   HAL_TIM_Encoder_Start(&htim1, TIM_CHANNEL_ALL);
@@ -140,9 +140,9 @@ int main(void)
   //   }
   // }
 
-  ILI9488_Init();
-  setRotation(3);
-  clear_screen();
+  ILI9488_Init();   // Configure ILI9488 registers
+  setRotation(3); // Set landscape mode. 0, 0 in bottom right
+  clear_screen(ETCH_A_SKETCH_YELLOW);   // Set screen to blank colour 
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -153,6 +153,7 @@ int main(void)
 
       case 0:
 
+        // Convert capture registers to cursor position
         uint16_t x_pos = TIM1->CNT / 4;
         uint16_t y_pos = TIM2->CNT / 4;
 
@@ -162,7 +163,7 @@ int main(void)
           // Check for wrap overflow or underflow
           if (width > 440){
             // Normalize to border, recalculate width
-            last_x_pos = (last_x_pos > 240) ? 480 : 0;
+            last_x_pos = (last_x_pos > 240) ? 0 : 480;
             width = (x_pos > last_x_pos) ? (x_pos - last_x_pos) : (last_x_pos - x_pos);
           }
 
@@ -178,7 +179,7 @@ int main(void)
           // Check for wrap overflow or underflow
           if (width > 300){
             // Normalize to border, recalculate width
-            last_y_pos = (last_y_pos > 160) ? 320 : 0;
+            last_y_pos = (last_y_pos > 160) ? 0 : 320;
             width = (y_pos > last_y_pos) ? (y_pos - last_y_pos) : (last_y_pos - y_pos);
           }
 
@@ -189,8 +190,8 @@ int main(void)
         }
       break;
       case 1:
-        float duty_cycle = (float)TIM2->CNT / (float)TIM2->ARR;
-        TIM16->CCR1 = duty_cycle * TIM16->ARR;
+        // Convert TIM2 scale to TIM16 scale with integer division
+        TIM16->CCR1 = (TIM2->CNT * TIM16->ARR) / (TIM2->ARR);
       break;
     }
 
@@ -577,8 +578,8 @@ static void MX_GPIO_Init(void)
 
   /*Configure GPIO pin : EXTI_PB_2_Pin */
   GPIO_InitStruct.Pin = EXTI_PB_2_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Mode = GPIO_MODE_IT_FALLING;
+  GPIO_InitStruct.Pull = GPIO_PULLUP;
   HAL_GPIO_Init(EXTI_PB_2_GPIO_Port, &GPIO_InitStruct);
 
   /*Configure GPIO pins : QUADSPI_CS_Pin LD4_Pin */
@@ -590,8 +591,8 @@ static void MX_GPIO_Init(void)
 
   /*Configure GPIO pin : EXTI_PB_1_Pin */
   GPIO_InitStruct.Pin = EXTI_PB_1_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Mode = GPIO_MODE_IT_FALLING;
+  GPIO_InitStruct.Pull = GPIO_PULLUP;
   HAL_GPIO_Init(EXTI_PB_1_GPIO_Port, &GPIO_InitStruct);
 
   /*Configure GPIO pin : TFT_CS_Pin */
@@ -614,6 +615,13 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
+  /* EXTI interrupt init*/
+  HAL_NVIC_SetPriority(EXTI4_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(EXTI4_IRQn);
+
+  HAL_NVIC_SetPriority(EXTI9_5_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(EXTI9_5_IRQn);
+
   /* USER CODE BEGIN MX_GPIO_Init_2 */
 
   /* USER CODE END MX_GPIO_Init_2 */
@@ -627,6 +635,7 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
       // Save cursor position and state
       last_x_pos = TIM1->CNT / 4;
       last_y_pos = TIM2->CNT / 4;
+      TIM2->CNT = (TIM16->CCR1 * TIM2->ARR) / TIM16->ARR;
       last_state = state;
       state = 1;
     } else {
@@ -636,13 +645,14 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
       state = last_state;
     }
   } else if (GPIO_Pin == EXTI_PB_2_Pin) {
-    clear_screen();
+    clear_screen(ETCH_A_SKETCH_YELLOW);
   }
 }
 
-static void clear_screen() {
+static void clear_screen(int colour) {
+   // Set screen to blank colour without overloading memory
   for (int i = 0; i < 16; i++) {
-    fillRect(0, 20 * i, 480, 20, ETCH_A_SKETCH_YELLOW);
+    fillRect(0, 20 * i, 480, 20, colour);
   }
 }
 

@@ -73,6 +73,7 @@ void Error_Handler(void);
 #define USART_RX_GPIO_Port GPIOA
 #define EXTI_PB_2_Pin GPIO_PIN_4
 #define EXTI_PB_2_GPIO_Port GPIOA
+#define EXTI_PB_2_EXTI_IRQn EXTI4_IRQn
 #define LCD_SCK_Pin GPIO_PIN_5
 #define LCD_SCK_GPIO_Port GPIOA
 #define QUADSPI_CS_Pin GPIO_PIN_2
@@ -81,6 +82,7 @@ void Error_Handler(void);
 #define LD4_GPIO_Port GPIOB
 #define EXTI_PB_1_Pin GPIO_PIN_9
 #define EXTI_PB_1_GPIO_Port GPIOC
+#define EXTI_PB_1_EXTI_IRQn EXTI9_5_IRQn
 #define TFT_CS_Pin GPIO_PIN_10
 #define TFT_CS_GPIO_Port GPIOA
 #define LCD_MOSI_Pin GPIO_PIN_12
@@ -95,8 +97,10 @@ void Error_Handler(void);
 #define SWO_GPIO_Port GPIOB
 #define EXTI_IMU_INT_1_Pin GPIO_PIN_5
 #define EXTI_IMU_INT_1_GPIO_Port GPIOB
+#define EXTI_IMU_INT_1_EXTI_IRQn EXTI9_5_IRQn
 #define EXTI_IMU_INT_2_Pin GPIO_PIN_6
 #define EXTI_IMU_INT_2_GPIO_Port GPIOB
+#define EXTI_IMU_INT_2_EXTI_IRQn EXTI9_5_IRQn
 
 /* USER CODE BEGIN Private defines */
 
