@@ -34,6 +34,8 @@
 /* USER CODE BEGIN PD */
 
 #define ETCH_A_SKETCH_YELLOW 0xd592
+#define ACCEL_COUNTS_PER_G 16384  // Value for used calibration range
+#define UPSIDE_DOWN_THRESHOLD   (int16_t)(-0.7f * ACCEL_COUNTS_PER_G)
 #define debug_led_on() HAL_GPIO_WritePin(GPIOB, GPIO_PIN_13, GPIO_PIN_SET)
 #define debug_led_off() HAL_GPIO_WritePin(GPIOB, GPIO_PIN_13, GPIO_PIN_RESET)
 
@@ -59,6 +61,7 @@ UART_HandleTypeDef huart2;
 /* USER CODE BEGIN PV */
 
 icm_42688_cfg_t imu_cfg;
+volatile uint8_t smd_event_flag = 0;
 volatile uint8_t state = 0;
 volatile uint8_t last_state = 0;
 volatile uint16_t last_x_pos = 1;
@@ -142,6 +145,15 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
+    if (smd_event_flag == 1){
+      smd_event_flag = 0;
+      int16_t data[3] = {0};
+      icm_42688_read_accel_xyz(&imu_cfg, data);
+      if (data[2] < -UPSIDE_DOWN_THRESHOLD){
+        clear_screen(ETCH_A_SKETCH_YELLOW);
+      }
+    }
+
     switch (state){
       case 0:
       {
@@ -344,7 +356,7 @@ static void MX_SPI3_Init(void)
   hspi3.Init.CLKPolarity = SPI_POLARITY_LOW;
   hspi3.Init.CLKPhase = SPI_PHASE_1EDGE;
   hspi3.Init.NSS = SPI_NSS_SOFT;
-  hspi3.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_2;
+  hspi3.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_4;
   hspi3.Init.FirstBit = SPI_FIRSTBIT_MSB;
   hspi3.Init.TIMode = SPI_TIMODE_DISABLE;
   hspi3.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
@@ -680,11 +692,7 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
       state = last_state;
     }
   } else if (GPIO_Pin == EXTI_IMU_INT_1_Pin) {
-    uint16_t data[3] = {0};
-    icm_42688_read_accel_xyz(&imu_cfg, data);
-    if (data[2] >= 0x80){
-      clear_screen(ETCH_A_SKETCH_YELLOW);
-    }
+    smd_event_flag = 1;
   }
 }
 
