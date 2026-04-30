@@ -47,6 +47,7 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     # Add user sources here
     ${CMAKE_CURRENT_SOURCE_DIR}/Drivers/ICM-42688-P/icm_42688.c
     ${CMAKE_CURRENT_SOURCE_DIR}/Drivers/ILI9488/ili9488.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/Drivers/W25Q64JV/w25q64jv.c
     
 )
 
@@ -55,6 +56,7 @@ target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE
     # Add user defined include paths
     ${CMAKE_CURRENT_SOURCE_DIR}/Drivers/ICM-42688-P/
     ${CMAKE_CURRENT_SOURCE_DIR}/Drivers/ILI9488/
+    ${CMAKE_CURRENT_SOURCE_DIR}/Drivers/W25Q64JV/
 )
 
 # Add project symbols (macros)
