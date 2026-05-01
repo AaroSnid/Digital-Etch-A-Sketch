@@ -52,7 +52,7 @@
 		(symbol "Adafruit_377_1_1"
 			(rectangle
 				(start -5.08 22.86)
-				(end 5.08 8.89)
+				(end 5.08 7.62)
 				(stroke
 					(width 0)
 					(type solid)
@@ -62,7 +62,7 @@
 				)
 			)
 			(pin output line
-				(at -2.54 6.35 90)
+				(at -2.54 5.08 90)
 				(length 2.54)
 				(name "Quad_A"
 					(effects
@@ -98,7 +98,7 @@
 				)
 			)
 			(pin input line
-				(at 0 6.35 90)
+				(at 0 5.08 90)
 				(length 2.54)
 				(name "C"
 					(effects
@@ -134,7 +134,7 @@
 				)
 			)
 			(pin output line
-				(at 2.54 6.35 90)
+				(at 2.54 5.08 90)
 				(length 2.54)
 				(name "Quad_B"
 					(effects
@@ -144,6 +144,42 @@
 					)
 				)
 				(number "B"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+			)
+			(pin input line
+				(at 7.62 16.51 180)
+				(length 2.54)
+				(name "S1"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+				(number "S1"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+			)
+			(pin input line
+				(at 7.62 16.51 180)
+				(length 2.54)
+				(name "S2"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+				(number "S2"
 					(effects
 						(font
 							(size 1.27 1.27)
