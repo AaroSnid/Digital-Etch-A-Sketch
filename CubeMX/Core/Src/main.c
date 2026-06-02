@@ -22,6 +22,8 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 
+#include "ili9488.h"
+
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -31,6 +33,8 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
+
+#define ETCH_A_SKETCH_YELLOW 0xd592
 
 /* USER CODE END PD */
 
@@ -51,6 +55,11 @@ TIM_HandleTypeDef htim16;
 
 /* USER CODE BEGIN PV */
 
+volatile uint8_t state = 0;
+volatile uint8_t last_state = 0;
+volatile uint16_t last_x_pos = 1;
+volatile uint16_t last_y_pos = 1;
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -63,6 +72,8 @@ static void MX_TIM1_Init(void);
 static void MX_TIM2_Init(void);
 static void MX_TIM16_Init(void);
 /* USER CODE BEGIN PFP */
+
+static void clear_screen(int colour);
 
 /* USER CODE END PFP */
 
@@ -108,12 +119,80 @@ int main(void)
   MX_TIM16_Init();
   /* USER CODE BEGIN 2 */
 
+  // Set initial PWM to max duty cycle for full brightness
+  TIM16->CCR1 = TIM16->ARR; 
+  HAL_TIM_PWM_Start(&htim16, TIM_CHANNEL_1);
+
+  // Start rotary encoder inputs
+  HAL_TIM_Encoder_Start(&htim2, TIM_CHANNEL_ALL);
+  HAL_TIM_Encoder_Start(&htim1, TIM_CHANNEL_ALL);
+
+  // Configure LCD screen registers
+  ILI9488_Init();
+  setRotation(3);                             // Set landscape mode. 0, 0 in bottom right
+  clear_screen(ETCH_A_SKETCH_YELLOW);    // Set screen to blank colour 
+  
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
+
+    // Enter code state machine
+    switch (state){
+
+      // Drawing cursor tracking encoders
+      case (0):
+        // Convert register values to cursor position
+        uint16_t x_pos = TIM1->CNT / 4;
+        uint16_t y_pos = TIM2->CNT / 4;
+
+        if (x_pos != last_x_pos){
+          uint16_t width = (x_pos > last_x_pos) ? (x_pos - last_x_pos) : (last_x_pos - x_pos);
+
+          // Check for wrap overflow or underflow
+          if (width > 440){
+            // Normalize to border, recalculate width
+            last_x_pos = (last_x_pos > 240) ? 0 : 480;
+            width = (x_pos > last_x_pos) ? (x_pos - last_x_pos) : (last_x_pos - x_pos);
+          }
+
+          // Start point must be on the right
+          uint16_t start_point = (x_pos > last_x_pos) ? last_x_pos : x_pos;
+          drawFastHLine(start_point, last_y_pos, width, TFT9341_BLACK);
+          last_x_pos = x_pos;
+        }
+
+        if (y_pos != last_y_pos){
+          uint16_t width = (y_pos > last_y_pos) ? (y_pos - last_y_pos) : (last_y_pos - y_pos);
+
+          // Check for wrap overflow or underflow
+          if (width > 300){
+            // Normalize to border, recalculate width
+            last_y_pos = (last_y_pos > 160) ? 0 : 320;
+            width = (y_pos > last_y_pos) ? (y_pos - last_y_pos) : (last_y_pos - y_pos);
+          }
+
+          // Start point must be on the bottom
+          uint16_t start_point = (y_pos > last_y_pos) ? last_y_pos : y_pos;
+          drawFastVLine(last_x_pos, start_point, width, TFT9341_BLACK);
+          last_y_pos = y_pos;
+        }
+        break;
+
+      // Screen brightness control
+      case (1):
+          // Convert TIM2 scale to TIM16 scale with integer division
+          TIM16->CCR1 = (TIM2->CNT * TIM16->ARR) / (TIM2->ARR);
+        break;
+
+      // Unknown state entered, default to 0  
+      default:
+        state = 0;
+        break;
+    }
+
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -503,6 +582,33 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
+
+void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
+  if (GPIO_Pin == EXTI_PB_1_Pin) {
+    if (state != 1){
+      // Save cursor position and state
+      last_x_pos = TIM1->CNT / 4;
+      last_y_pos = TIM2->CNT / 4;
+      TIM2->CNT = (TIM16->CCR1 * TIM2->ARR) / TIM16->ARR;
+      last_state = state;
+      state = 1;
+    } else {
+      // Restore cursor and state
+      TIM1->CNT = last_x_pos * 4;
+      TIM2->CNT = last_y_pos * 4;
+      state = last_state;
+    }
+  } else if (GPIO_Pin == EXTI_IMU_INT_1_Pin) {
+    smd_event_flag = 1;
+  }
+}
+
+static void clear_screen(int colour) {
+   // Set screen to blank colour without overloading memory
+  for (int i = 0; i < 16; i++) {
+    fillRect(0, 20 * i, 480, 20, colour);
+  }
+}
 
 /* USER CODE END 4 */
 

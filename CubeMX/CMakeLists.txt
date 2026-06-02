@@ -45,11 +45,17 @@ target_link_directories(${CMAKE_PROJECT_NAME} PRIVATE
 # Add sources to executable
 target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     # Add user sources here
+    ${CMAKE_CURRENT_SOURCE_DIR}/Drivers/LIS3DHTR/lis3dhtr.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/Drivers/ILI9488/ili9488.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/Drivers/W25Q64JV/w25q64jv.c
 )
 
 # Add include paths
 target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE
     # Add user defined include paths
+    ${CMAKE_CURRENT_SOURCE_DIR}/Drivers/LIS3DHTR/
+    ${CMAKE_CURRENT_SOURCE_DIR}/Drivers/ILI9488/
+    ${CMAKE_CURRENT_SOURCE_DIR}/Drivers/W25Q64JV/
 )
 
 # Add project symbols (macros)
