@@ -55,6 +55,7 @@ TIM_HandleTypeDef htim16;
 
 /* USER CODE BEGIN PV */
 
+volatile uint8_t smd_event_flag = 0;
 volatile uint8_t state = 0;
 volatile uint8_t last_state = 0;
 volatile uint16_t last_x_pos = 1;

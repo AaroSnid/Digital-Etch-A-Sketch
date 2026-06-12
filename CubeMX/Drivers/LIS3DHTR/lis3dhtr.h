@@ -31,9 +31,9 @@ typedef enum {
     LIS3DH_ODR_100HZ            = 5,
     LIS3DH_ODR_200HZ            = 6,
     LIS3DH_ODR_400HZ            = 7,
-    LIS3DH_ODR_1_344KHZ         = 8,
-    LIS3DH_ODR_1_620KHZ         = 9,
-    LIS3DH_ODR_5_376KHZ         = 10,
+    LIS3DH_ODR_1_620KHZ         = 8,
+    LIS3DH_ODR_5_376KHZ         = 9,
+    LIS3DH_ODR_1_344KHZ         = 9,
 } lis3dh_odr_t;
 
 typedef enum {
@@ -44,10 +44,10 @@ typedef enum {
 } lis3dh_fifo_mode_t;
 
 typedef struct {
+    uint8_t fill_level;
     bool empty;
     bool watermark;
     bool overrun;
-    uint8_t fill_level;
 } lis3dh_fifo_status_t;
 
 typedef enum {
@@ -56,9 +56,9 @@ typedef enum {
 } lis3dh_int_pin_t;
 
 typedef enum {
-    LIS3DH_ADC_CHANNEL_1        = 1,
+    LIS3DH_ADC_CHANNEL_1        = 0,
     LIS3DH_ADC_CHANNEL_2        = 2,
-    LIS3DH_ADC_CHANNEL_3        = 3,
+    LIS3DH_ADC_CHANNEL_3        = 4,
 } lis3dh_adc_channel_t;
 
 typedef enum {
@@ -70,8 +70,8 @@ typedef enum {
 
 typedef struct {
     void *comms_handle;
-    GPIO_TypeDef* chip_select_port;
-    uint16_t chip_select_pin;
+    GPIO_TypeDef* cs_port;
+    uint16_t cs_pin;
 } lis3dhtr_cfg_t;
 
 typedef struct {
@@ -162,6 +162,14 @@ int lis3dh_read_g_acceleration(lis3dhtr_cfg_t *hw_cfg, lis3dh_g_data_t *g_data);
 int lis3dh_get_status(lis3dhtr_cfg_t *hw_cfg, uint8_t *status);
 
 /**
+ * @brief Reads the full sensor aux status register.
+ *
+ * @param hw_cfg        Driver configuration structure
+ * @param status        Pointer to return aux status register contents
+ */
+int lis3dh_get_aux_status(lis3dhtr_cfg_t *hw_cfg, uint8_t *status);
+
+/**
  * @brief Enables or disables the self-test function.
  *
  * @param hw_cfg        Driver configuration structure
@@ -249,7 +257,18 @@ int lis3dh_get_fifo_status(lis3dhtr_cfg_t *hw_cfg, lis3dh_fifo_status_t *status)
  * @param samples_to_read   Number of samples requested
  * @param samples_read      Pointer to return number of samples actually read
  */
-int lis3dh_read_fifo_data(lis3dhtr_cfg_t *hw_cfg, lis3dh_raw_data_t *fifo_samples,
+int lis3dh_read_raw_fifo_data(lis3dhtr_cfg_t *hw_cfg, lis3dh_raw_data_t *fifo_samples,
+                          uint8_t samples_to_read, uint8_t *samples_read);
+
+/**
+ * @brief Reads acceleration samples in g from the FIFO buffer.
+ *
+ * @param hw_cfg            Driver configuration structure
+ * @param fifo_samples      Array to receive FIFO samples
+ * @param samples_to_read   Number of samples requested
+ * @param samples_read      Pointer to return number of samples actually read
+ */
+int lis3dh_read_g_fifo_data(lis3dhtr_cfg_t *hw_cfg, lis3dh_g_data_t *fifo_samples,
                           uint8_t samples_to_read, uint8_t *samples_read);
 
 /**
@@ -307,6 +326,14 @@ int lis3dh_fifo_enable(lis3dhtr_cfg_t *hw_cfg);
  * @param hw_cfg        Driver configuration structure
  */
 int lis3dh_fifo_disable(lis3dhtr_cfg_t *hw_cfg);
+
+/**
+ * @brief Controls SDO/SA0 pull-up
+ *
+ * @param hw_cfg        Driver configuration structure
+ * @param enable        True to enable pull-up
+ */
+int lis3dh_control_pull_up(lis3dhtr_cfg_t *hw_cfg, bool enable);
 
 #ifdef __cplusplus
 }

@@ -6,8 +6,7 @@
  */
 #include "ili9488.h"
 
-extern SPI_HandleTypeDef hspi1;
-extern UART_HandleTypeDef huart1;
+extern SPI_HandleTypeDef hspi3;
 
 static uint8_t rotationNum = 1;
 static bool _cp437    = false;
@@ -44,7 +43,7 @@ void ILI9488_SendCommand(uint8_t com)
 	//HAL_GPIO_WritePin(tftCS_GPIO, tftCS_PIN, GPIO_PIN_RESET);
 	CS_A();
 	//Write byte using SPI
-	HAL_SPI_Transmit(&hspi1, &tmpCmd, 1, 1);
+	HAL_SPI_Transmit(&hspi3, &tmpCmd, 1, 1);
 	//SendByte(tmpCmd);
 	//WaitLastData();
 	CS_D();
@@ -64,7 +63,7 @@ void ILI9488_SendData(uint8_t data)
 	//HAL_GPIO_WritePin(tftCS_GPIO, tftCS_PIN, GPIO_PIN_RESET);
 	CS_A();
 	//Write byte using SPI
-	HAL_SPI_Transmit(&hspi1, &tmpCmd, 1, 1);
+	HAL_SPI_Transmit(&hspi3, &tmpCmd, 1, 1);
 	//SendByte(tmpCmd);
 	//WaitLastData();
 	CS_D();
@@ -87,7 +86,7 @@ void ILI9488_SendData_Multi(uint8_t *buff, size_t buff_size){
 	CS_A();
 	while (buff_size > 0){
 		uint16_t chunk_size = buff_size > 32768 ? 32768 : buff_size;
-		HAL_SPI_Transmit(&hspi1, buff, chunk_size, HAL_MAX_DELAY);
+		HAL_SPI_Transmit(&hspi3, buff, chunk_size, HAL_MAX_DELAY);
 		buff += chunk_size;
 		buff_size -= chunk_size;
 	}
@@ -510,7 +509,7 @@ void fillRect(int16_t x, int16_t y, int16_t w, int16_t h, uint16_t color)
 	CS_A();
 		while(cnt>0)
 		{
-			HAL_SPI_Transmit(&hspi1, frm_buf, buf_size, HAL_MAX_DELAY);
+			HAL_SPI_Transmit(&hspi3, frm_buf, buf_size, HAL_MAX_DELAY);
 
 			cnt -= 1;
 		}
@@ -624,8 +623,8 @@ void write16BitColor(uint16_t color)
 	  b = (b * 255) / 31;
 	  uint8_t data[3] = {r, g, b};
 	  ILI9488_SendData_Multi(data, 3);
-	  //HAL_SPI_Transmit(&hspi1, (uint8_t *)&r, 1, 10);
-	  //HAL_SPI_Transmit(&hspi1, (uint8_t *)&g, 1, 10);
-	  //HAL_SPI_Transmit(&hspi1, (uint8_t *)&b, 1, 10);
+	  //HAL_SPI_Transmit(&hspi3, (uint8_t *)&r, 1, 10);
+	  //HAL_SPI_Transmit(&hspi3, (uint8_t *)&g, 1, 10);
+	  //HAL_SPI_Transmit(&hspi3, (uint8_t *)&b, 1, 10);
 
 }
