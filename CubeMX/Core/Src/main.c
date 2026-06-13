@@ -56,7 +56,9 @@ TIM_HandleTypeDef htim16;
 
 /* USER CODE BEGIN PV */
 
-volatile uint8_t smd_event_flag = 0;
+lis3dhtr_cfg_t lis3dhtr_cfg;
+volatile uint8_t shake_event_flag = 0;
+volatile uint8_t clear_screen_flag = 0;
 volatile uint8_t state = 0;
 volatile uint8_t last_state = 0;
 volatile uint16_t last_x_pos = 1;
@@ -134,7 +136,8 @@ int main(void)
   setRotation(3);                             // Set landscape mode. 0, 0 in bottom right
   clear_screen(ETCH_A_SKETCH_YELLOW);    // Set screen to blank colour 
   
-  lis3dh_init(&lis3dhtr_cfg, hspi2, SPI2_CS_GPIO_Port, SPI2_CS_Pin);
+  lis3dh_init(&lis3dhtr_cfg, &hspi2, SPI2_CS_GPIO_Port, SPI2_CS_Pin);
+  lis3dh_configure_data(&lis3dhtr_cfg, LIS3DH_ODR_100HZ, LIS3DH_2, LIS3DH_MODE_NORMAL, 0x07);
   lis3dh_configure_shake_to_erase(&lis3dhtr_cfg, true);
 
   /* USER CODE END 2 */
@@ -143,6 +146,22 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
+
+    if (shake_event_flag == 1){
+
+      // Check if device was facing down at time of interrupt
+      if (clear_screen_flag == 1){
+
+        clear_screen(ETCH_A_SKETCH_YELLOW);
+        clear_screen_flag = 0;
+      }
+
+        // Clear interrupt latch from accelerometer
+        uint8_t clear_token;
+        lis3dh_read_interrupt_source(&lis3dhtr_cfg, LIS3DH_INT_PIN_1, &clear_token);
+
+        shake_event_flag = 0;
+    }
 
     // Enter code state machine
     switch (state){
@@ -555,11 +574,17 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : EXTI_IMU_INT_2_Pin EXTI_IMU_INT_1_Pin EXTI_PB_2_Pin */
-  GPIO_InitStruct.Pin = EXTI_IMU_INT_2_Pin|EXTI_IMU_INT_1_Pin|EXTI_PB_2_Pin;
+  /*Configure GPIO pins : EXTI_IMU_INT_1_Pin EXTI_PB_2_Pin */
+  GPIO_InitStruct.Pin = EXTI_IMU_INT_1_Pin|EXTI_PB_2_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : EXTI_IMU_INT_2_Pin */
+  GPIO_InitStruct.Pin = EXTI_IMU_INT_2_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  HAL_GPIO_Init(EXTI_IMU_INT_2_GPIO_Port, &GPIO_InitStruct);
 
   /*Configure GPIO pin : EXTI_PB_1_Pin */
   GPIO_InitStruct.Pin = EXTI_PB_1_Pin;
@@ -604,7 +629,15 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
       state = last_state;
     }
   } else if (GPIO_Pin == EXTI_IMU_INT_1_Pin) {
-    smd_event_flag = 1;
+    
+    // Read physical INT2 pin state (which mirrors live upside-down status)
+    bool is_upside_down = (HAL_GPIO_ReadPin(EXTI_IMU_INT_2_GPIO_Port, EXTI_IMU_INT_2_Pin) == GPIO_PIN_SET);
+
+    if (is_upside_down) {
+        clear_screen_flag = 1;
+    }
+    
+    shake_event_flag = 1;
   }
 }
 

@@ -61,12 +61,11 @@ void Error_Handler(void);
 /* Private defines -----------------------------------------------------------*/
 #define SPI2_CS_Pin GPIO_PIN_11
 #define SPI2_CS_GPIO_Port GPIOB
-#define EXTI_IMU_INT_2_Pin GPIO_PIN_12
-#define EXTI_IMU_INT_2_GPIO_Port GPIOB
-#define EXTI_IMU_INT_2_EXTI_IRQn EXTI15_10_IRQn
-#define EXTI_IMU_INT_1_Pin GPIO_PIN_13
+#define EXTI_IMU_INT_1_Pin GPIO_PIN_12
 #define EXTI_IMU_INT_1_GPIO_Port GPIOB
 #define EXTI_IMU_INT_1_EXTI_IRQn EXTI15_10_IRQn
+#define EXTI_IMU_INT_2_Pin GPIO_PIN_13
+#define EXTI_IMU_INT_2_GPIO_Port GPIOB
 #define EXTI_PB_1_Pin GPIO_PIN_10
 #define EXTI_PB_1_GPIO_Port GPIOA
 #define EXTI_PB_1_EXTI_IRQn EXTI15_10_IRQn
