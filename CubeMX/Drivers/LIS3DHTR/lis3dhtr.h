@@ -335,6 +335,14 @@ int lis3dh_fifo_disable(lis3dhtr_cfg_t *hw_cfg);
  */
 int lis3dh_control_pull_up(lis3dhtr_cfg_t *hw_cfg, bool enable);
 
+/**
+ * @brief Project Specific Configuration for dual-interrupt hardware setup for shake-to-erase functionality
+ *
+ * @param hw_cfg        Driver configuration structure
+ * @param enable        True to configure and enable the setup, false to clear registers
+ */
+int lis3dh_configure_shake_to_erase(lis3dhtr_cfg_t *hw_cfg, bool enable);
+
 #ifdef __cplusplus
 }
 #endif

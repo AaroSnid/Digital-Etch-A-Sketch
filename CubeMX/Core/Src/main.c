@@ -23,6 +23,7 @@
 /* USER CODE BEGIN Includes */
 
 #include "ili9488.h"
+#include "lis3dhtr.h"
 
 /* USER CODE END Includes */
 
@@ -34,7 +35,7 @@
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
 
-#define ETCH_A_SKETCH_YELLOW 0xd592
+#define ETCH_A_SKETCH_YELLOW 0xD592
 
 /* USER CODE END PD */
 
@@ -133,6 +134,9 @@ int main(void)
   setRotation(3);                             // Set landscape mode. 0, 0 in bottom right
   clear_screen(ETCH_A_SKETCH_YELLOW);    // Set screen to blank colour 
   
+  lis3dh_init(&lis3dhtr_cfg, hspi2, SPI2_CS_GPIO_Port, SPI2_CS_Pin);
+  lis3dh_configure_shake_to_erase(&lis3dhtr_cfg, true);
+
   /* USER CODE END 2 */
 
   /* Infinite loop */
