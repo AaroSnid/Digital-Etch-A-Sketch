@@ -30,6 +30,11 @@
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
 
+typedef enum {
+  SYSTEM_STATE_DRAWING,
+  SYSTEM_STATE_DIMMING,
+} system_states;
+
 /* USER CODE END PTD */
 
 /* Private define ------------------------------------------------------------*/
@@ -59,8 +64,8 @@ TIM_HandleTypeDef htim16;
 lis3dhtr_cfg_t lis3dhtr_cfg;
 volatile uint8_t shake_event_flag = 0;
 volatile uint8_t clear_screen_flag = 0;
-volatile uint8_t state = 0;
-volatile uint8_t last_state = 0;
+volatile system_states state = SYSTEM_STATE_DRAWING;
+volatile system_states last_state = 0;
 volatile uint16_t last_x_pos = 1;
 volatile uint16_t last_y_pos = 1;
 
@@ -167,7 +172,7 @@ int main(void)
     switch (state){
 
       // Drawing cursor tracking encoders
-      case (0):
+      case (SYSTEM_STATE_DRAWING):
         // Convert register values to cursor position
         uint16_t x_pos = TIM1->CNT / 4;
         uint16_t y_pos = TIM2->CNT / 4;
@@ -206,14 +211,14 @@ int main(void)
         break;
 
       // Screen brightness control
-      case (1):
+      case (SYSTEM_STATE_DIMMING):
           // Convert TIM2 scale to TIM16 scale with integer division
           TIM16->CCR1 = (TIM2->CNT * TIM16->ARR) / (TIM2->ARR);
         break;
 
-      // Unknown state entered, default to 0  
+      // Unknown state entered, default to drawing 
       default:
-        state = 0;
+        state = SYSTEM_STATE_DRAWING;
         break;
     }
 
@@ -615,13 +620,13 @@ static void MX_GPIO_Init(void)
 
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
   if (GPIO_Pin == EXTI_PB_1_Pin) {
-    if (state != 1){
+    if (state != SYSTEM_STATE_DIMMING){
       // Save cursor position and state
       last_x_pos = TIM1->CNT / 4;
       last_y_pos = TIM2->CNT / 4;
       TIM2->CNT = (TIM16->CCR1 * TIM2->ARR) / TIM16->ARR;
       last_state = state;
-      state = 1;
+      state = SYSTEM_STATE_DIMMING;
     } else {
       // Restore cursor and state
       TIM1->CNT = last_x_pos * 4;
