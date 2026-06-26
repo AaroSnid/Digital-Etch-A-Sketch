@@ -19,21 +19,12 @@ The **Digital Etch-A-Sketch** is a portable recreation of the classic Etch-A-Ske
 
 - **Physical Controls**
   - Two rotary encoders for X/Y movement
-  - Push buttons for erase, menu, and selection <span style="color:gray">(Menu Not Yet Implemented)</span>
 
 - **Shake to Erase**
-  - Gyroscope + accelerometer detect motion <span style="color:gray">(Not Yet Implemented)</span>
-  - Realistic screen erase gesture <span style="color:gray">(Not Yet Implemented)</span>
-
-- **Flip-Book Animation Mode**
-  - Store up to ~80 frames in external flash <span style="color:gray">(Not Yet Implemented)</span>
-  - Automatic playback <span style="color:gray">(Not Yet Implemented)</span> 
-  - Previous frame shown in light gray while drawing next <span style="color:gray">(Not Yet Implemented)</span>
+  - Accelerometer detect motion for realistic screen erase gesture 
 
 - **Portable & Low Power**
   - Powered by 2× AA batteries
-  - Boost converter to regulated 3.3 V
-  - Low-power MCU modes with motion-based wakeup
 
 ---
 
@@ -43,7 +34,7 @@ The **Digital Etch-A-Sketch** is a portable recreation of the classic Etch-A-Ske
 |-----------------|--------------------|-----|-------|
 | MCU             | STM32L433CCT6      | 1   | Main controller |
 | Display         | 3.5" ILI9488 SPI   | 1   | 3.5" display |
-| QSPI Flash      | W25Q64JV           | 1   | 8 MB frame storage |
+| QSPI Flash      | For future expansion | 1   | Reserved for future use |
 | 3-axis Accelerometer      | LIS3DTHR        | 1   | 3-axis velocity sensor |
 | Rotary Encoder  | PEC11R-4215F-S0024 | 2   | User input |
 | Battery Holder  | Adafruit 4194      | 1   | 2× AA |
@@ -96,11 +87,11 @@ The screen is mounted to the board using the female pin headers on either side. 
 
 ### Storage
 
-- **Part:** Winbond W25Q64JV
-- **Capacity:** 8 MB (64 Mbit)
-- **Interface:** Quad SPI
+- **Part:** For future expansion
+- **Capacity:** Reserved for future use
+- **Interface:** Quad SPI (if added later)
 - **Purpose:**
-  - Store animation frames
+  - Potential animation frame storage
   - Potential configuration data
 
 ---
@@ -136,16 +127,15 @@ The screen is mounted to the board using the female pin headers on either side. 
 
 ### Overview
 
-The firmware runs mainly inside of a state machine, easily allowing for the same user inputs to be used for different purposes. Standard drawing is state 0, with other states added as needed.
+The firmware runs mainly inside of a state machine, easily allowing for the same user inputs to be used for different purposes.
 
 ---
 
 ## Debug & Firmware Update
 
 - **Interface:** SWD
-- **Pins Required:**  
-  - DIO  
-  - CLK  
+- **Exposed Pins:**  
+  - SWDIO  
+  - SWCLK  
   - NRST  
-  - VCC  
-  - GND  
+  - VCC + GND  
