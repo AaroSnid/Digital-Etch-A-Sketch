@@ -24,6 +24,7 @@
 
 #include "ili9488.h"
 #include "lis3dhtr.h"
+#include <stdint.h>
 
 /* USER CODE END Includes */
 
@@ -33,6 +34,7 @@
 typedef enum {
   SYSTEM_STATE_DRAWING,
   SYSTEM_STATE_DIMMING,
+  SYSTEM_STATE_THICKNESS_SELECT,
 } system_states;
 
 /* USER CODE END PTD */
@@ -61,13 +63,20 @@ TIM_HandleTypeDef htim16;
 
 /* USER CODE BEGIN PV */
 
-lis3dhtr_cfg_t lis3dhtr_cfg;
-volatile uint8_t shake_event_flag = 0;
-volatile uint8_t clear_screen_flag = 0;
 volatile system_states state = SYSTEM_STATE_DRAWING;
-volatile system_states last_state = 0;
+volatile system_states last_state = SYSTEM_STATE_DRAWING;
+
+lis3dhtr_cfg_t lis3dhtr_cfg;
+
+volatile bool shake_event_flag = 0;
+volatile bool confirm_clear_screen_flag = 0;
+
 volatile uint16_t last_x_pos = 1;
 volatile uint16_t last_y_pos = 1;
+
+uint8_t system_line_thickness = 1;
+uint8_t previous_system_line_thickness = 1;
+
 
 /* USER CODE END PV */
 
@@ -152,20 +161,20 @@ int main(void)
   while (1)
   {
 
-    if (shake_event_flag == 1){
+    if (shake_event_flag == true){
 
       // Check if device was facing down at time of interrupt
-      if (clear_screen_flag == 1){
+      if (confirm_clear_screen_flag == true){
 
         clear_screen(ETCH_A_SKETCH_YELLOW);
-        clear_screen_flag = 0;
+        confirm_clear_screen_flag = false;
       }
 
         // Clear interrupt latch from accelerometer
         uint8_t clear_token;
         lis3dh_read_interrupt_source(&lis3dhtr_cfg, LIS3DH_INT_PIN_1, &clear_token);
 
-        shake_event_flag = 0;
+        shake_event_flag = false;
     }
 
     // Enter code state machine
@@ -178,34 +187,34 @@ int main(void)
         uint16_t y_pos = TIM2->CNT / 4;
 
         if (x_pos != last_x_pos){
-          uint16_t width = (x_pos > last_x_pos) ? (x_pos - last_x_pos) : (last_x_pos - x_pos);
+          uint16_t line_length = (x_pos > last_x_pos) ? (x_pos - last_x_pos) : (last_x_pos - x_pos);
 
           // Check for wrap overflow or underflow
-          if (width > 440){
-            // Normalize to border, recalculate width
+          if (line_length > 440){
+            // Normalize to border, recalculate length
             last_x_pos = (last_x_pos > 240) ? 0 : 480;
-            width = (x_pos > last_x_pos) ? (x_pos - last_x_pos) : (last_x_pos - x_pos);
+            line_length = (x_pos > last_x_pos) ? (x_pos - last_x_pos) : (last_x_pos - x_pos);
           }
 
           // Start point must be on the right
           uint16_t start_point = (x_pos > last_x_pos) ? last_x_pos : x_pos;
-          drawFastHLine(start_point, last_y_pos, width, TFT9341_BLACK);
+          fillRect(start_point, last_y_pos, line_length, system_line_thickness, TFT9341_BLACK);
           last_x_pos = x_pos;
         }
 
         if (y_pos != last_y_pos){
-          uint16_t width = (y_pos > last_y_pos) ? (y_pos - last_y_pos) : (last_y_pos - y_pos);
+          uint16_t line_length = (y_pos > last_y_pos) ? (y_pos - last_y_pos) : (last_y_pos - y_pos);
 
           // Check for wrap overflow or underflow
-          if (width > 300){
-            // Normalize to border, recalculate width
+          if (line_length > 300){
+            // Normalize to border, recalculate line_length
             last_y_pos = (last_y_pos > 160) ? 0 : 320;
-            width = (y_pos > last_y_pos) ? (y_pos - last_y_pos) : (last_y_pos - y_pos);
+            line_length = (y_pos > last_y_pos) ? (y_pos - last_y_pos) : (last_y_pos - y_pos);
           }
 
           // Start point must be on the bottom
           uint16_t start_point = (y_pos > last_y_pos) ? last_y_pos : y_pos;
-          drawFastVLine(last_x_pos, start_point, width, TFT9341_BLACK);
+          fillRect(last_x_pos, start_point, system_line_thickness, line_length, TFT9341_BLACK);
           last_y_pos = y_pos;
         }
         break;
@@ -214,6 +223,26 @@ int main(void)
       case (SYSTEM_STATE_DIMMING):
           // Convert TIM2 scale to TIM16 scale with integer division
           TIM16->CCR1 = (TIM2->CNT * TIM16->ARR) / (TIM2->ARR);
+        break;
+
+      case (SYSTEM_STATE_THICKNESS_SELECT):
+
+        // Scale timer counter to size of uint8 with integer division (multiply first else CNT/ARR == 0)
+        system_line_thickness = (TIM2->CNT * UINT8_MAX) / (TIM2->ARR);
+        
+        // Minumum line thickness of 1
+        if (system_line_thickness == 0){
+          system_line_thickness = 1;
+        }
+
+        // Clear space taken by previous thickness to accurately represent current one
+        if (system_line_thickness < previous_system_line_thickness){
+            fillRect(last_x_pos, last_y_pos, previous_system_line_thickness, previous_system_line_thickness, ETCH_A_SKETCH_YELLOW);
+            previous_system_line_thickness = system_line_thickness;
+        }
+
+        // Preview cursor thickness
+        fillRect(last_x_pos, last_y_pos, system_line_thickness, system_line_thickness, TFT9341_BLACK);
         break;
 
       // Unknown state entered, default to drawing 
@@ -633,16 +662,31 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
       TIM2->CNT = last_y_pos * 4;
       state = last_state;
     }
-  } else if (GPIO_Pin == EXTI_IMU_INT_1_Pin) {
+  } else if (GPIO_Pin == EXTI_PB_2_Pin) {
+    if (state != SYSTEM_STATE_THICKNESS_SELECT){
+      // Save cursor position and state
+      last_x_pos = TIM1->CNT / 4;
+      last_y_pos = TIM2->CNT / 4;
+      TIM2->CNT = (TIM2->ARR * system_line_thickness) / (UINT8_MAX);
+      last_state = state;
+      state = SYSTEM_STATE_THICKNESS_SELECT;
+    } else {
+      // Restore cursor and state
+      TIM1->CNT = last_x_pos * 4;
+      TIM2->CNT = last_y_pos * 4;
+      state = last_state;
+    }
+  }
+  else if (GPIO_Pin == EXTI_IMU_INT_1_Pin) {
     
     // Read physical INT2 pin state (which mirrors live upside-down status)
     bool is_upside_down = (HAL_GPIO_ReadPin(EXTI_IMU_INT_2_GPIO_Port, EXTI_IMU_INT_2_Pin) == GPIO_PIN_SET);
 
     if (is_upside_down) {
-        clear_screen_flag = 1;
+        confirm_clear_screen_flag = true;
     }
     
-    shake_event_flag = 1;
+    shake_event_flag = true;
   }
 }
 
