@@ -33,6 +33,7 @@
 
 typedef enum {
   SYSTEM_STATE_DRAWING,
+  SYSTEM_STATE_ERASING,
   SYSTEM_STATE_DIMMING,
   SYSTEM_STATE_THICKNESS_SELECT,
 } system_states;
@@ -218,7 +219,24 @@ int main(void)
           last_y_pos = y_pos;
         }
         break;
+      case (SYSTEM_STATE_ERASING):
+        // Convert register values to cursor position
+        uint16_t erase_x_pos = TIM1->CNT / 4;
+        uint16_t erase_y_pos = TIM2->CNT / 4;
 
+        // Since it only regenerates on movement, there should be no flickering (no delay needed)
+        if ((erase_x_pos != last_x_pos) || (erase_y_pos != last_y_pos)) {
+          fillRect(last_x_pos, last_y_pos, system_line_thickness, system_line_thickness, ETCH_A_SKETCH_YELLOW);
+          last_x_pos = erase_x_pos;
+          last_y_pos = erase_y_pos;
+          fillRect(last_x_pos, last_y_pos, system_line_thickness, system_line_thickness, TFT9341_BLACK);
+          
+          // Leave only an outline if possible
+          if (system_line_thickness > 2){
+              fillRect((last_x_pos + 1), (last_y_pos + 1), (system_line_thickness - 2), (system_line_thickness - 2), ETCH_A_SKETCH_YELLOW);
+          }
+        }
+        break;
       // Screen brightness control
       case (SYSTEM_STATE_DIMMING):
           // Convert TIM2 scale to TIM16 scale with integer division
@@ -649,32 +667,41 @@ static void MX_GPIO_Init(void)
 
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
   if (GPIO_Pin == EXTI_PB_1_Pin) {
-    if (state != SYSTEM_STATE_DIMMING){
-      // Save cursor position and state
-      last_x_pos = TIM1->CNT / 4;
-      last_y_pos = TIM2->CNT / 4;
-      TIM2->CNT = (TIM16->CCR1 * TIM2->ARR) / TIM16->ARR;
-      last_state = state;
-      state = SYSTEM_STATE_DIMMING;
-    } else {
-      // Restore cursor and state
-      TIM1->CNT = last_x_pos * 4;
-      TIM2->CNT = last_y_pos * 4;
-      state = last_state;
+    switch (state) {
+      case SYSTEM_STATE_DRAWING:
+        // First PB1 press enters dimming mode
+        last_x_pos = TIM1->CNT / 4;
+        last_y_pos = TIM2->CNT / 4;
+        TIM2->CNT = (TIM16->CCR1 * TIM2->ARR) / TIM16->ARR;
+        state = SYSTEM_STATE_DIMMING;
+        break;
+
+      case SYSTEM_STATE_DIMMING:
+        // Second PB1 press enters thickness selection mode
+        last_x_pos = TIM1->CNT / 4;
+        last_y_pos = TIM2->CNT / 4;
+        TIM2->CNT = (TIM2->ARR * system_line_thickness) / (UINT8_MAX);
+        state = SYSTEM_STATE_THICKNESS_SELECT;
+        break;
+
+      case SYSTEM_STATE_THICKNESS_SELECT:
+        // Third PB1 press returns to normal drawing mode
+        TIM1->CNT = last_x_pos * 4;
+        TIM2->CNT = last_y_pos * 4;
+        state = SYSTEM_STATE_DRAWING;
+        break;
+
+      default:
+        state = SYSTEM_STATE_DRAWING;
+        break;
     }
   } else if (GPIO_Pin == EXTI_PB_2_Pin) {
-    if (state != SYSTEM_STATE_THICKNESS_SELECT){
-      // Save cursor position and state
+    if (state == SYSTEM_STATE_ERASING) {
+      state = SYSTEM_STATE_DRAWING;
+    } else {
       last_x_pos = TIM1->CNT / 4;
       last_y_pos = TIM2->CNT / 4;
-      TIM2->CNT = (TIM2->ARR * system_line_thickness) / (UINT8_MAX);
-      last_state = state;
-      state = SYSTEM_STATE_THICKNESS_SELECT;
-    } else {
-      // Restore cursor and state
-      TIM1->CNT = last_x_pos * 4;
-      TIM2->CNT = last_y_pos * 4;
-      state = last_state;
+      state = SYSTEM_STATE_ERASING;
     }
   }
   else if (GPIO_Pin == EXTI_IMU_INT_1_Pin) {
