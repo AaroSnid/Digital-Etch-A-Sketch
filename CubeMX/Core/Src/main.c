@@ -626,22 +626,22 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : EXTI_IMU_INT_1_Pin EXTI_PB_2_Pin */
-  GPIO_InitStruct.Pin = EXTI_IMU_INT_1_Pin|EXTI_PB_2_Pin;
+  /*Configure GPIO pin : EXTI_IMU_INT_1_Pin */
+  GPIO_InitStruct.Pin = EXTI_IMU_INT_1_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+  GPIO_InitStruct.Pull = GPIO_PULLDOWN;
+  HAL_GPIO_Init(EXTI_IMU_INT_1_GPIO_Port, &GPIO_InitStruct);
 
   /*Configure GPIO pin : EXTI_IMU_INT_2_Pin */
   GPIO_InitStruct.Pin = EXTI_IMU_INT_2_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Pull = GPIO_PULLDOWN;
   HAL_GPIO_Init(EXTI_IMU_INT_2_GPIO_Port, &GPIO_InitStruct);
 
   /*Configure GPIO pin : EXTI_PB_1_Pin */
   GPIO_InitStruct.Pin = EXTI_PB_1_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Mode = GPIO_MODE_IT_FALLING;
+  GPIO_InitStruct.Pull = GPIO_PULLUP;
   HAL_GPIO_Init(EXTI_PB_1_GPIO_Port, &GPIO_InitStruct);
 
   /*Configure GPIO pin : TFT_RST_Pin */
@@ -650,6 +650,12 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(TFT_RST_GPIO_Port, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : EXTI_PB_2_Pin */
+  GPIO_InitStruct.Pin = EXTI_PB_2_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_IT_FALLING;
+  GPIO_InitStruct.Pull = GPIO_PULLUP;
+  HAL_GPIO_Init(EXTI_PB_2_GPIO_Port, &GPIO_InitStruct);
 
   /* EXTI interrupt init*/
   HAL_NVIC_SetPriority(EXTI9_5_IRQn, 0, 0);
