@@ -45,6 +45,8 @@ typedef enum {
 
 #define ETCH_A_SKETCH_YELLOW 0xD592
 
+#define MAX_CURSOR_THICKNESS 40   // Capped for visual and performance reasons
+
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -199,7 +201,12 @@ int main(void)
 
           // Start point must be on the right
           uint16_t start_point = (x_pos > last_x_pos) ? last_x_pos : x_pos;
-          fillRect(start_point, last_y_pos, line_length, system_line_thickness, TFT9341_BLACK);
+
+          // Draw a centered square the size square the cursor represents
+          uint16_t half_thickness = system_line_thickness / 2;
+          uint16_t square_x = (start_point >= half_thickness) ? (start_point - half_thickness) : 0;
+          uint16_t square_y = (last_y_pos >= half_thickness) ? (last_y_pos - half_thickness) : 0;
+          fillRect(square_x, square_y, line_length + system_line_thickness, system_line_thickness, TFT9341_BLACK);
           last_x_pos = x_pos;
         }
 
@@ -215,7 +222,12 @@ int main(void)
 
           // Start point must be on the bottom
           uint16_t start_point = (y_pos > last_y_pos) ? last_y_pos : y_pos;
-          fillRect(last_x_pos, start_point, system_line_thickness, line_length, TFT9341_BLACK);
+
+          // Draw a centered square the size square the cursor represents
+          uint16_t half_thickness = system_line_thickness / 2;
+          uint16_t square_x = (last_x_pos >= half_thickness) ? (last_x_pos - half_thickness) : 0;
+          uint16_t square_y = (start_point >= half_thickness) ? (start_point - half_thickness) : 0;
+          fillRect(square_x, square_y, system_line_thickness, line_length + system_line_thickness, TFT9341_BLACK);
           last_y_pos = y_pos;
         }
         break;
@@ -226,14 +238,20 @@ int main(void)
 
         // Since it only regenerates on movement, there should be no flickering (no delay needed)
         if ((erase_x_pos != last_x_pos) || (erase_y_pos != last_y_pos)) {
-          fillRect(last_x_pos, last_y_pos, system_line_thickness, system_line_thickness, ETCH_A_SKETCH_YELLOW);
+          uint16_t half_thickness = system_line_thickness / 2;
+          uint16_t old_square_x = (last_x_pos >= half_thickness) ? (last_x_pos - half_thickness) : 0;
+          uint16_t old_square_y = (last_y_pos >= half_thickness) ? (last_y_pos - half_thickness) : 0;
+          fillRect(old_square_x, old_square_y, system_line_thickness, system_line_thickness, ETCH_A_SKETCH_YELLOW);
+
           last_x_pos = erase_x_pos;
           last_y_pos = erase_y_pos;
-          fillRect(last_x_pos, last_y_pos, system_line_thickness, system_line_thickness, TFT9341_BLACK);
-          
+          uint16_t new_square_x = (last_x_pos >= half_thickness) ? (last_x_pos - half_thickness) : 0;
+          uint16_t new_square_y = (last_y_pos >= half_thickness) ? (last_y_pos - half_thickness) : 0;
+          fillRect(new_square_x, new_square_y, system_line_thickness, system_line_thickness, TFT9341_BLACK);
+
           // Leave only an outline if possible
           if (system_line_thickness > 2){
-              fillRect((last_x_pos + 1), (last_y_pos + 1), (system_line_thickness - 2), (system_line_thickness - 2), ETCH_A_SKETCH_YELLOW);
+              fillRect((new_square_x + 1), (new_square_y + 1), (system_line_thickness - 2), (system_line_thickness - 2), ETCH_A_SKETCH_YELLOW);
           }
         }
         break;
@@ -246,7 +264,7 @@ int main(void)
       case (SYSTEM_STATE_THICKNESS_SELECT):
 
         // Scale timer counter to size of uint8 with integer division (multiply first else CNT/ARR == 0)
-        system_line_thickness = (TIM2->CNT * UINT8_MAX) / (TIM2->ARR);
+        system_line_thickness = (TIM2->CNT * MAX_CURSOR_THICKNESS) / (TIM2->ARR);
         
         // Minumum line thickness of 1
         if (system_line_thickness == 0){
@@ -255,12 +273,18 @@ int main(void)
 
         // Clear space taken by previous thickness to accurately represent current one
         if (system_line_thickness < previous_system_line_thickness){
-            fillRect(last_x_pos, last_y_pos, previous_system_line_thickness, previous_system_line_thickness, ETCH_A_SKETCH_YELLOW);
+            uint16_t prev_half_thickness = previous_system_line_thickness / 2;
+            uint16_t prev_square_x = (last_x_pos >= prev_half_thickness) ? (last_x_pos - prev_half_thickness) : 0;
+            uint16_t prev_square_y = (last_y_pos >= prev_half_thickness) ? (last_y_pos - prev_half_thickness) : 0;
+            fillRect(prev_square_x, prev_square_y, previous_system_line_thickness, previous_system_line_thickness, ETCH_A_SKETCH_YELLOW);
             previous_system_line_thickness = system_line_thickness;
         }
 
-        // Preview cursor thickness
-        fillRect(last_x_pos, last_y_pos, system_line_thickness, system_line_thickness, TFT9341_BLACK);
+        // Preview cursor thickness, centered on the true cursor position
+        uint16_t half_thickness = system_line_thickness / 2;
+        uint16_t square_x = (last_x_pos >= half_thickness) ? (last_x_pos - half_thickness) : 0;
+        uint16_t square_y = (last_y_pos >= half_thickness) ? (last_y_pos - half_thickness) : 0;
+        fillRect(square_x, square_y, system_line_thickness, system_line_thickness, TFT9341_BLACK);
         break;
 
       // Unknown state entered, default to drawing 
@@ -684,9 +708,8 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
 
       case SYSTEM_STATE_DIMMING:
         // Second PB1 press enters thickness selection mode
-        last_x_pos = TIM1->CNT / 4;
-        last_y_pos = TIM2->CNT / 4;
-        TIM2->CNT = (TIM2->ARR * system_line_thickness) / (UINT8_MAX);
+        // last_x/y_pos already hold the original drawing position
+        TIM2->CNT = (TIM2->ARR * system_line_thickness) / (MAX_CURSOR_THICKNESS);
         state = SYSTEM_STATE_THICKNESS_SELECT;
         break;
 
