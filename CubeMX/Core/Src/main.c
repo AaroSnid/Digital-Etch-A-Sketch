@@ -76,6 +76,7 @@ volatile bool confirm_clear_screen_flag = 0;
 
 volatile uint16_t last_x_pos = 1;
 volatile uint16_t last_y_pos = 1;
+volatile uint16_t previous_selector_cnt = 0;
 
 uint8_t system_line_thickness = 1;
 uint8_t previous_system_line_thickness = 1;
@@ -184,7 +185,7 @@ int main(void)
     switch (state){
 
       // Drawing cursor tracking encoders
-      case (SYSTEM_STATE_DRAWING):
+      case (SYSTEM_STATE_DRAWING): {
         // Convert register values to cursor position
         uint16_t x_pos = TIM1->CNT / 4;
         uint16_t y_pos = TIM2->CNT / 4;
@@ -231,7 +232,9 @@ int main(void)
           last_y_pos = y_pos;
         }
         break;
-      case (SYSTEM_STATE_ERASING):
+      }
+
+      case (SYSTEM_STATE_ERASING): {
         // Convert register values to cursor position
         uint16_t erase_x_pos = TIM1->CNT / 4;
         uint16_t erase_y_pos = TIM2->CNT / 4;
@@ -255,29 +258,49 @@ int main(void)
           }
         }
         break;
+    }
       // Screen brightness control
-      case (SYSTEM_STATE_DIMMING):
-          // Convert TIM2 scale to TIM16 scale with integer division
-          TIM16->CCR1 = (TIM2->CNT * TIM16->ARR) / (TIM2->ARR);
-        break;
+      case (SYSTEM_STATE_DIMMING): {
+          uint16_t current_cnt = TIM2->CNT;
+          uint16_t delta = (current_cnt > previous_selector_cnt) ? (current_cnt - previous_selector_cnt) : (previous_selector_cnt - current_cnt);
 
-      case (SYSTEM_STATE_THICKNESS_SELECT):
+          // A large jump in a single tick means the counter wrapped
+          if (delta > (TIM2->ARR / 2)) {
+            current_cnt = (current_cnt < previous_selector_cnt) ? TIM2->ARR : 0;
+            TIM2->CNT = current_cnt;
+          }
+          previous_selector_cnt = current_cnt;
+
+          // Convert TIM2 scale to TIM16 scale with integer division
+          TIM16->CCR1 = (current_cnt * TIM16->ARR) / (TIM2->ARR);
+        break;
+      }
+
+      case (SYSTEM_STATE_THICKNESS_SELECT): {
+        uint16_t current_cnt = TIM2->CNT;
+        uint16_t delta = (current_cnt > previous_selector_cnt) ? (current_cnt - previous_selector_cnt) : (previous_selector_cnt - current_cnt);
+
+        // Same wrap-clamping as the brightness selector above
+        if (delta > (TIM2->ARR / 2)) {
+          current_cnt = (current_cnt < previous_selector_cnt) ? TIM2->ARR : 0;
+          TIM2->CNT = current_cnt;
+        }
+        previous_selector_cnt = current_cnt;
 
         // Scale timer counter to size of uint8 with integer division (multiply first else CNT/ARR == 0)
-        system_line_thickness = (TIM2->CNT * MAX_CURSOR_THICKNESS) / (TIM2->ARR);
+        system_line_thickness = (current_cnt * MAX_CURSOR_THICKNESS) / (TIM2->ARR);
         
         // Minumum line thickness of 1
         if (system_line_thickness == 0){
           system_line_thickness = 1;
         }
 
-        // Clear space taken by previous thickness to accurately represent current one
+        // Clear the area the larger previous thickness so the new one is visible
         if (system_line_thickness < previous_system_line_thickness){
             uint16_t prev_half_thickness = previous_system_line_thickness / 2;
             uint16_t prev_square_x = (last_x_pos >= prev_half_thickness) ? (last_x_pos - prev_half_thickness) : 0;
             uint16_t prev_square_y = (last_y_pos >= prev_half_thickness) ? (last_y_pos - prev_half_thickness) : 0;
             fillRect(prev_square_x, prev_square_y, previous_system_line_thickness, previous_system_line_thickness, ETCH_A_SKETCH_YELLOW);
-            previous_system_line_thickness = system_line_thickness;
         }
 
         // Preview cursor thickness, centered on the true cursor position
@@ -285,12 +308,16 @@ int main(void)
         uint16_t square_x = (last_x_pos >= half_thickness) ? (last_x_pos - half_thickness) : 0;
         uint16_t square_y = (last_y_pos >= half_thickness) ? (last_y_pos - half_thickness) : 0;
         fillRect(square_x, square_y, system_line_thickness, system_line_thickness, TFT9341_BLACK);
+
+        previous_system_line_thickness = system_line_thickness;
         break;
+      }
 
       // Unknown state entered, default to drawing 
-      default:
+      default: {
         state = SYSTEM_STATE_DRAWING;
         break;
+      }
     }
 
     /* USER CODE END WHILE */
@@ -703,6 +730,7 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
         last_x_pos = TIM1->CNT / 4;
         last_y_pos = TIM2->CNT / 4;
         TIM2->CNT = (TIM16->CCR1 * TIM2->ARR) / TIM16->ARR;
+        previous_selector_cnt = TIM2->CNT;
         state = SYSTEM_STATE_DIMMING;
         break;
 
@@ -710,6 +738,7 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
         // Second PB1 press enters thickness selection mode
         // last_x/y_pos already hold the original drawing position
         TIM2->CNT = (TIM2->ARR * system_line_thickness) / (MAX_CURSOR_THICKNESS);
+        previous_selector_cnt = TIM2->CNT;
         state = SYSTEM_STATE_THICKNESS_SELECT;
         break;
 
