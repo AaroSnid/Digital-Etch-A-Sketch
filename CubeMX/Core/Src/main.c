@@ -728,8 +728,15 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
     if (state == SYSTEM_STATE_ERASING) {
       state = SYSTEM_STATE_DRAWING;
     } else {
-      last_x_pos = TIM1->CNT / 4;
-      last_y_pos = TIM2->CNT / 4;
+      // last_x_pos/last_y_pos already hold the real saved drawing position
+      if (state == SYSTEM_STATE_DRAWING) {
+        last_x_pos = TIM1->CNT / 4;
+        last_y_pos = TIM2->CNT / 4;
+      } else {
+        // Coming from DIMMING/THICKNESS_SELECT
+        TIM1->CNT = last_x_pos * 4;
+        TIM2->CNT = last_y_pos * 4;
+      }
       state = SYSTEM_STATE_ERASING;
     }
   }
