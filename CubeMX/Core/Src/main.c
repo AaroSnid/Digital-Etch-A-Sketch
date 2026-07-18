@@ -66,20 +66,22 @@ TIM_HandleTypeDef htim16;
 
 /* USER CODE BEGIN PV */
 
-volatile system_states state = SYSTEM_STATE_DRAWING;
-volatile system_states last_state = SYSTEM_STATE_DRAWING;
+system_states state = SYSTEM_STATE_DRAWING;
 
 lis3dhtr_cfg_t lis3dhtr_cfg;
 
 volatile bool shake_event_flag = 0;
 volatile bool confirm_clear_screen_flag = 0;
 
-volatile uint16_t last_x_pos = 1;
-volatile uint16_t last_y_pos = 1;
-volatile uint16_t previous_selector_cnt = 0;
+uint16_t last_x_pos = 1;
+uint16_t last_y_pos = 1;
+uint16_t previous_selector_cnt = 0;
 
 uint8_t system_line_thickness = 1;
 uint8_t previous_system_line_thickness = 1;
+
+volatile bool pb1_interrupt_fired = false;
+volatile bool pb2_interrupt_fired = false;
 
 
 /* USER CODE END PV */
@@ -179,6 +181,58 @@ int main(void)
         lis3dh_read_interrupt_source(&lis3dhtr_cfg, LIS3DH_INT_PIN_1, &clear_token);
 
         shake_event_flag = false;
+    }
+
+    // Handle state change outside ISR
+    if (pb1_interrupt_fired){
+      switch (state) {
+        case SYSTEM_STATE_DRAWING:
+          // First PB1 press enters dimming mode
+          last_x_pos = TIM1->CNT / 4;
+          last_y_pos = TIM2->CNT / 4;
+          TIM2->CNT = (TIM16->CCR1 * TIM2->ARR) / TIM16->ARR;
+          previous_selector_cnt = TIM2->CNT;
+          state = SYSTEM_STATE_DIMMING;
+          break;
+
+        case SYSTEM_STATE_DIMMING:
+          // Second PB1 press enters thickness selection mode
+          // last_x/y_pos already hold the original drawing position
+          TIM2->CNT = (TIM2->ARR * system_line_thickness) / (MAX_CURSOR_THICKNESS);
+          previous_selector_cnt = TIM2->CNT;
+          state = SYSTEM_STATE_THICKNESS_SELECT;
+          break;
+
+        case SYSTEM_STATE_THICKNESS_SELECT:
+          // Third PB1 press returns to normal drawing mode
+          TIM1->CNT = last_x_pos * 4;
+          TIM2->CNT = last_y_pos * 4;
+          state = SYSTEM_STATE_DRAWING;
+          break;
+
+        default:
+          state = SYSTEM_STATE_DRAWING;
+          break;
+      }
+      pb1_interrupt_fired = false;
+    }
+
+    if (pb2_interrupt_fired){
+        if (state == SYSTEM_STATE_ERASING) {
+          state = SYSTEM_STATE_DRAWING;
+        } else {
+          // last_x_pos/last_y_pos already hold the real saved drawing position
+          if (state == SYSTEM_STATE_DRAWING) {
+            last_x_pos = TIM1->CNT / 4;
+            last_y_pos = TIM2->CNT / 4;
+          } else {
+            // Coming from DIMMING/THICKNESS_SELECT
+            TIM1->CNT = last_x_pos * 4;
+            TIM2->CNT = last_y_pos * 4;
+          }
+          state = SYSTEM_STATE_ERASING;
+        }
+        pb2_interrupt_fired = false;
     }
 
     // Enter code state machine
@@ -724,50 +778,9 @@ static void MX_GPIO_Init(void)
 
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
   if (GPIO_Pin == EXTI_PB_1_Pin) {
-    switch (state) {
-      case SYSTEM_STATE_DRAWING:
-        // First PB1 press enters dimming mode
-        last_x_pos = TIM1->CNT / 4;
-        last_y_pos = TIM2->CNT / 4;
-        TIM2->CNT = (TIM16->CCR1 * TIM2->ARR) / TIM16->ARR;
-        previous_selector_cnt = TIM2->CNT;
-        state = SYSTEM_STATE_DIMMING;
-        break;
-
-      case SYSTEM_STATE_DIMMING:
-        // Second PB1 press enters thickness selection mode
-        // last_x/y_pos already hold the original drawing position
-        TIM2->CNT = (TIM2->ARR * system_line_thickness) / (MAX_CURSOR_THICKNESS);
-        previous_selector_cnt = TIM2->CNT;
-        state = SYSTEM_STATE_THICKNESS_SELECT;
-        break;
-
-      case SYSTEM_STATE_THICKNESS_SELECT:
-        // Third PB1 press returns to normal drawing mode
-        TIM1->CNT = last_x_pos * 4;
-        TIM2->CNT = last_y_pos * 4;
-        state = SYSTEM_STATE_DRAWING;
-        break;
-
-      default:
-        state = SYSTEM_STATE_DRAWING;
-        break;
-    }
+    pb1_interrupt_fired = true;
   } else if (GPIO_Pin == EXTI_PB_2_Pin) {
-    if (state == SYSTEM_STATE_ERASING) {
-      state = SYSTEM_STATE_DRAWING;
-    } else {
-      // last_x_pos/last_y_pos already hold the real saved drawing position
-      if (state == SYSTEM_STATE_DRAWING) {
-        last_x_pos = TIM1->CNT / 4;
-        last_y_pos = TIM2->CNT / 4;
-      } else {
-        // Coming from DIMMING/THICKNESS_SELECT
-        TIM1->CNT = last_x_pos * 4;
-        TIM2->CNT = last_y_pos * 4;
-      }
-      state = SYSTEM_STATE_ERASING;
-    }
+    pb2_interrupt_fired = true;
   }
   else if (GPIO_Pin == EXTI_IMU_INT_1_Pin) {
     
