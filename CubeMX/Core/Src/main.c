@@ -43,9 +43,16 @@ typedef enum {
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
 
-#define ETCH_A_SKETCH_YELLOW 0xD592
+#define ETCH_A_SKETCH_GREY 0xD592
 
 #define MAX_CURSOR_THICKNESS 40   // Capped for visual and performance reasons
+
+// Use classic grey background
+#if 0
+#define BACKGROUND_COLOR ETCH_A_SKETCH_GREY
+#else
+#define BACKGROUND_COLOR 0xFFFF
+#endif
 
 /* USER CODE END PD */
 
@@ -154,7 +161,7 @@ int main(void)
   // Configure LCD screen registers
   ILI9488_Init();
   setRotation(3);                             // Set landscape mode. 0, 0 in bottom right
-  clear_screen(ETCH_A_SKETCH_YELLOW);    // Set screen to blank colour 
+  clear_screen(BACKGROUND_COLOR);    // Set screen to blank colour 
   
   lis3dh_init(&lis3dhtr_cfg, &hspi2, SPI2_CS_GPIO_Port, SPI2_CS_Pin);
   lis3dh_configure_data(&lis3dhtr_cfg, LIS3DH_ODR_100HZ, LIS3DH_2, LIS3DH_MODE_NORMAL, 0x07);
@@ -172,7 +179,7 @@ int main(void)
       // Check if device was facing down at time of interrupt
       if (confirm_clear_screen_flag == true){
 
-        clear_screen(ETCH_A_SKETCH_YELLOW);
+        clear_screen(BACKGROUND_COLOR);
         confirm_clear_screen_flag = false;
       }
 
@@ -298,7 +305,7 @@ int main(void)
           uint16_t half_thickness = system_line_thickness / 2;
           uint16_t old_square_x = (last_x_pos >= half_thickness) ? (last_x_pos - half_thickness) : 0;
           uint16_t old_square_y = (last_y_pos >= half_thickness) ? (last_y_pos - half_thickness) : 0;
-          fillRect(old_square_x, old_square_y, system_line_thickness, system_line_thickness, ETCH_A_SKETCH_YELLOW);
+          fillRect(old_square_x, old_square_y, system_line_thickness, system_line_thickness, BACKGROUND_COLOR);
 
           last_x_pos = erase_x_pos;
           last_y_pos = erase_y_pos;
@@ -308,7 +315,7 @@ int main(void)
 
           // Leave only an outline if possible
           if (system_line_thickness > 2){
-              fillRect((new_square_x + 1), (new_square_y + 1), (system_line_thickness - 2), (system_line_thickness - 2), ETCH_A_SKETCH_YELLOW);
+              fillRect((new_square_x + 1), (new_square_y + 1), (system_line_thickness - 2), (system_line_thickness - 2), BACKGROUND_COLOR);
           }
         }
         break;
@@ -354,7 +361,7 @@ int main(void)
             uint16_t prev_half_thickness = previous_system_line_thickness / 2;
             uint16_t prev_square_x = (last_x_pos >= prev_half_thickness) ? (last_x_pos - prev_half_thickness) : 0;
             uint16_t prev_square_y = (last_y_pos >= prev_half_thickness) ? (last_y_pos - prev_half_thickness) : 0;
-            fillRect(prev_square_x, prev_square_y, previous_system_line_thickness, previous_system_line_thickness, ETCH_A_SKETCH_YELLOW);
+            fillRect(prev_square_x, prev_square_y, previous_system_line_thickness, previous_system_line_thickness, BACKGROUND_COLOR);
         }
 
         // Preview cursor thickness, centered on the true cursor position

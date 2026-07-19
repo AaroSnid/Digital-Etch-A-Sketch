@@ -417,54 +417,43 @@ int lis3dh_control_pull_up(lis3dhtr_cfg_t *hw_cfg, bool enable){
 int lis3dh_configure_shake_to_erase(lis3dhtr_cfg_t *hw_cfg, bool enable) {
     if (!hw_cfg) return -1;
 
-if (enable) {
-
-        // 1. ROUTE HIGH-PASS FILTER TO INT1 ENGINE
+    if (enable) {
+        // ROUTE HIGH-PASS FILTER TO INT1 ENGINE
         uint8_t ctrl_reg2 = 0x01; 
         if (spi_write_data(hw_cfg, CTRL_REG2, &ctrl_reg2, 1) != 0) return -1;
 
-        // 2. CONFIGURE INT1 FOR LATERAL SHAKING (DYNAMIC INTERRUPT)
-        // AOI = 0, 6D = 0 (Standard OR combination for motion wake-up)
-        // Enable X-High (Bit 1) and Y-High (Bit 3) high-pass transient thresholds.
-        uint8_t int1_cfg = 0x0A; 
+        // CONFIGURE INT1 FOR LATERAL SHAKING (DYNAMIC INTERRUPT)
+        uint8_t int1_cfg = 0x0A; // X-High and Y-High
         if (spi_write_data(hw_cfg, INT1_CFG, &int1_cfg, 1) != 0) return -1;
 
-        // Set high threshold for a deliberate shake (~1.5g)
-        // At +/-2g full scale, 1 LSB = 16mg. 1500mg / 16mg per LSB = ~93 (0x5D)
-        uint8_t int1_ths = 0x5D;
+        uint8_t int1_ths = 0x2A; // Balanced shake threshold (~0.6g)
         if (spi_write_data(hw_cfg, INT1_THS, &int1_ths, 1) != 0) return -1;
 
-        // Small duration to filter out tiny ESD spikes / mechanical clicking noises
-        uint8_t int1_dur = 0x02; 
+        uint8_t int1_dur = 0x00; // Trigger instantly on a shake peak
         if (spi_write_data(hw_cfg, INT1_DURATION, &int1_dur, 1) != 0) return -1;
 
-        // 3. CONFIGURE INT2 FOR Z-AXIS POSITION (STATIC LEVEL PIN)
-        // AOI = 0, 6D = 1 (6D/4D Orientation configuration mode)
-        uint8_t int2_cfg = (0x01 << 6) | 0x10; 
+        // CONFIGURE INT2 FOR Z-AXIS POSITION (STATIC LEVEL PIN)
+        uint8_t int2_cfg = 0xD0; // AOI = 1, 6D = 1, ZLIE = 1 (6D Position Mode)
         if (spi_write_data(hw_cfg, INT2_CFG, &int2_cfg, 1) != 0) return -1;
 
-        // ~0.5g threshold for orientation stability (0x20 at +/-2g full scale)
-        uint8_t int2_ths = 0x20; 
+        uint8_t int2_ths = 0x20; // Stable orientation threshold (~0.5g)
         if (spi_write_data(hw_cfg, INT2_THS, &int2_ths, 1) != 0) return -1;
 
-        // Immediate transition reflection (no duration delay)
-        uint8_t int2_dur = 0x00; 
+        uint8_t int2_dur = 0x00; // Trigger instantly on orientation change
         if (spi_write_data(hw_cfg, INT2_DURATION, &int2_dur, 1) != 0) return -1;
 
-        // 4. LATCH AND PIN ROUTING MECHANICS
-        uint8_t ctrl_reg5 = 0x08; 
+        // LATCH AND PIN ROUTING MECHANICS
+        uint8_t ctrl_reg5 = 0x08; // Latch INT1 shake events
         if (spi_write_data(hw_cfg, CTRL_REG5, &ctrl_reg5, 1) != 0) return -1;
 
-        // CTRL_REG3: Map the latched INT1 shake signal to the physical INT1 pin (Pin 11)
-        uint8_t ctrl_reg3 = 0x40; // I1_INT1 = 1
+        uint8_t ctrl_reg3 = 0x40; // Map INT1 to physical pin
         if (spi_write_data(hw_cfg, CTRL_REG3, &ctrl_reg3, 1) != 0) return -1;
 
-        // CTRL_REG6: Map the raw INT2 orientation signal to the physical INT2 pin (Pin 9)
-        uint8_t ctrl_reg6 = 0x20; // I2_INT2 = 1
+        uint8_t ctrl_reg6 = 0x20; // Map INT2 to physical pin
         if (spi_write_data(hw_cfg, CTRL_REG6, &ctrl_reg6, 1) != 0) return -1;
 
     } else {
-        // Safe clean up
+
         uint8_t clear = 0x00;
         spi_write_data(hw_cfg, INT1_CFG, &clear, 1);
         spi_write_data(hw_cfg, INT2_CFG, &clear, 1);
