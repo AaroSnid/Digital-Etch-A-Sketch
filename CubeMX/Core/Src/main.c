@@ -105,7 +105,7 @@ static void MX_TIM16_Init(void);
 /* USER CODE BEGIN PFP */
 
 static void clear_screen(int colour);
-static void fill_cursor_box(uint16_t x, uint16_t y, uint8_t thickness, uint8_t colour)
+static void fill_cursor_box(uint16_t x, uint16_t y, uint8_t thickness, uint16_t colour);
 
 /* USER CODE END PFP */
 
@@ -167,6 +167,10 @@ int main(void)
   lis3dh_init(&lis3dhtr_cfg, &hspi2, SPI2_CS_GPIO_Port, SPI2_CS_Pin);
   lis3dh_configure_data(&lis3dhtr_cfg, LIS3DH_ODR_100HZ, LIS3DH_2, LIS3DH_MODE_NORMAL, 0x07);
   lis3dh_configure_shake_to_erase(&lis3dhtr_cfg, true);
+
+  // Set default cursor position
+  TIM1->CNT = 0;
+  TIM2->CNT = 0;
 
   /* USER CODE END 2 */
 
@@ -245,7 +249,8 @@ int main(void)
           }
           state = SYSTEM_STATE_ERASING;
           // Prevent aritifact from previous state from showing
-          fill_cursor_box(last_x_pos, last_y_pos, system_line_thickness, BACKGROUND_COLOR);
+          uint8_t box_thickness = (system_line_thickness > 2) ? (system_line_thickness - 2) : system_line_thickness;
+          fill_cursor_box((last_x_pos + 1), (last_y_pos + 1), box_thickness, BACKGROUND_COLOR);
           
         }
         pb2_interrupt_fired = false;
@@ -818,7 +823,7 @@ static void clear_screen(int colour) {
   }
 }
 
-static void fill_cursor_box(uint16_t x, uint16_t y, uint8_t thickness, uint8_t colour){
+static void fill_cursor_box(uint16_t x, uint16_t y, uint8_t thickness, uint16_t colour){
   
   uint16_t half_thickness = thickness / 2;
   uint16_t square_x = (x >= half_thickness) ? (x - half_thickness) : 0;
