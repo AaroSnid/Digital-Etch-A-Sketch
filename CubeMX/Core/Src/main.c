@@ -105,6 +105,7 @@ static void MX_TIM16_Init(void);
 /* USER CODE BEGIN PFP */
 
 static void clear_screen(int colour);
+static void fill_cursor_box(uint16_t x, uint16_t y, uint8_t thickness, uint8_t colour)
 
 /* USER CODE END PFP */
 
@@ -215,6 +216,9 @@ int main(void)
           TIM1->CNT = last_x_pos * 4;
           TIM2->CNT = last_y_pos * 4;
           state = SYSTEM_STATE_DRAWING;
+
+          // Prevent aritifact from previous state from showing
+          fill_cursor_box(last_x_pos, last_y_pos, system_line_thickness, TFT9341_BLACK);
           break;
 
         default:
@@ -227,6 +231,8 @@ int main(void)
     if (pb2_interrupt_fired){
         if (state == SYSTEM_STATE_ERASING) {
           state = SYSTEM_STATE_DRAWING;
+          // Prevent aritifact from previous state from showing
+          fill_cursor_box(last_x_pos, last_y_pos, system_line_thickness, TFT9341_BLACK);
         } else {
           // last_x_pos/last_y_pos already hold the real saved drawing position
           if (state == SYSTEM_STATE_DRAWING) {
@@ -238,6 +244,9 @@ int main(void)
             TIM2->CNT = last_y_pos * 4;
           }
           state = SYSTEM_STATE_ERASING;
+          // Prevent aritifact from previous state from showing
+          fill_cursor_box(last_x_pos, last_y_pos, system_line_thickness, BACKGROUND_COLOR);
+          
         }
         pb2_interrupt_fired = false;
     }
@@ -807,6 +816,15 @@ static void clear_screen(int colour) {
   for (int i = 0; i < 16; i++) {
     fillRect(0, 20 * i, 480, 20, colour);
   }
+}
+
+static void fill_cursor_box(uint16_t x, uint16_t y, uint8_t thickness, uint8_t colour){
+  
+  uint16_t half_thickness = thickness / 2;
+  uint16_t square_x = (x >= half_thickness) ? (x - half_thickness) : 0;
+  uint16_t square_y = (y >= half_thickness) ? (y - half_thickness) : 0;
+  
+  fillRect(square_x, square_y, thickness, thickness, colour);
 }
 
 /* USER CODE END 4 */

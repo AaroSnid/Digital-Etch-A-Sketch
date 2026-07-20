@@ -1,8 +1,8 @@
 # Digital Etch-A-Sketch
 
-The **Digital Etch-A-Sketch** is a portable recreation of the classic Etch-A-Sketch drawing toy, built around an STM32 microcontroller, a 3.5" TFT display, and  rotary encoders for drawing cursor control. This project's main features are a motion-based erase and flip-book style animation playback.
+The **Digital Etch-A-Sketch** is a portable recreation of the classic Etch-A-Sketch drawing toy, built around an STM32 microcontroller, a 3.5" TFT display, and  rotary encoders for drawing cursor control. This project's main features are the rotary encoder cursor control, realistic screen erase gesture, and selectable drawing thickness.
 
-> **Status:** Development on Rev1 Board  
+> **Status:** Major Firmware Version Finalized
 > **Hardware Version:** Rev1
 
 ![PCB Rev1 with screen attached](./Media/Rev1/printed_name.jpeg)
@@ -13,18 +13,18 @@ The **Digital Etch-A-Sketch** is a portable recreation of the classic Etch-A-Ske
 
 - **Freehand Drawing**
   - Pixel-accurate cursor control
-  - Encoder movement acceleration based control <span style="color:gray">(Not Yet Implemented)</span>
-  - Pick-up / put-down cursor mode <span style="color:gray">(Not Yet Implemented)</span>
-  - Multiple drawing thicknesses <span style="color:gray">(Not Yet Implemented)</span>
+  - Trailless travel / eraser function
+  - Selectable drawing thickness and brightness control
 
 - **Physical Controls**
   - Two rotary encoders for X/Y movement
+  - Encoder pushbuttons to for system setting selection
 
 - **Shake to Erase**
   - Accelerometer detect motion for realistic screen erase gesture 
 
 - **Portable & Low Power**
-  - Powered by 2× AA batteries
+  - Powered by 2× AA batteries or by USB-C port
 
 ---
 
@@ -127,7 +127,9 @@ The screen is mounted to the board using the female pin headers on either side. 
 
 ### Overview
 
-The firmware runs mainly inside of a state machine, easily allowing for the same user inputs to be used for different purposes.
+The firmware runs inside of a state machine, easily allowing for the same user inputs to be used for different purposes.
+The main loop runs (per iteration) a check for the screen erase, handles state change, and then enters the state machine section for currently selected action.
+An external driver is used for the ILI9488 display, all other firmware is made by me.
 
 ---
 
